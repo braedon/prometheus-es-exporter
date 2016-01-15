@@ -6,7 +6,7 @@ Values are parsed out of the Elasticsearch results automatically, with the path 
 Metrics are only extracted from aggregation results, with the exception of the query doc count. The keys of any buckets are converted to labels, rather than being inserted into the metric name.
 See `test_parser.py` for all the supported queries/metrics.
 
-You will need to install some dependencies:
+You will need Python 3 installed, along with some dependencies:
 ```
 > sudo pip3 install elasticsearch prometheus_client
 ```
