@@ -1,4 +1,3 @@
-# prometheus-es-exporter
 Prometheus Elasticsearch Exporter
 ====
 This Prometheus exporter periodically runs configured queries against an Elasticsearch cluster and exports the results as Prometheus gauge metrics.
