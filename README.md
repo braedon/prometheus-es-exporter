@@ -15,4 +15,4 @@ Start the exporter by running `exporter.py`:
 > ./exporter.py
 ```
 
-Configuration is provided by an `exporter.ini` file in your working directory. See the provided file for configuration examples and explanation.
+Configuration is provided by an `exporter.cfg` file in your working directory. See the provided file for configuration examples and explanation.

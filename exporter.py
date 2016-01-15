@@ -62,7 +62,7 @@ def run_scheduler(scheduler, es_client, name, interval, query):
 
 if __name__ == '__main__':
     config = configparser.ConfigParser()
-    config.read('exporter.ini')
+    config.read('exporter.cfg')
 
     port = config.getint('exporter', 'Port')
     es_hosts = config.get('elasticsearch', 'Hosts').split(',')
