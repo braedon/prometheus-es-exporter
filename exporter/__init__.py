@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 import configparser
 import json
 import sched
@@ -7,7 +6,7 @@ import time
 from elasticsearch import Elasticsearch
 from prometheus_client import start_http_server, Gauge
 
-from parser import parse_response
+from exporter.parser import parse_response
 
 gauges = {}
 
@@ -60,7 +59,7 @@ def run_scheduler(scheduler, es_client, name, interval, query):
         (next_scheduled_time, interval)
     )
 
-if __name__ == '__main__':
+def main():
     config = configparser.ConfigParser()
     config.read('exporter.cfg')
 
