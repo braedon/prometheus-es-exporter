@@ -21,7 +21,7 @@ setup(
     packages=find_packages(exclude=['tests']),
     install_requires=[
         'elasticsearch',
-        'prometheus_client'
+        'prometheus-client'
     ],
     entry_points={
         'console_scripts': [
