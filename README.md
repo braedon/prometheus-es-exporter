@@ -20,6 +20,18 @@ Once installed, you can run the exporter with:
 
 Configuration is provided by an `exporter.cfg` file in your working directory. See the provided file for configuration examples and explanation.
 
+Alternatively, you can build a docker image using the provided Dockerfile. Run the following in the root project directory:
+```
+> sudo docker build -t prometheus-es-exporter .
+```
+To run a contain successfully, you will need to mount a `exporter.cfg` to `/usr/src/app/exporter.cfg`. You probably also need to expose the port configured in your config file. For example:
+```
+> sudo docker run --rm --name exporter \
+    -v <path to exporter.cfg>:/usr/src/app/exporter.cfg \
+    -p 8080:8080 \
+    prometheus-es-exporter
+```
+
 To run tests (once again, from the root project directory), use:
 ```
 > python3 -m tests.test_parser
