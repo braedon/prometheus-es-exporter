@@ -17,21 +17,39 @@ def format_metric_name(name_list):
     return '_'.join(name_list)
 
 def update_gauges(metrics):
+    metric_dict = {}
     for (name_list, label_dict, value) in metrics:
         metric_name = format_metric_name(name_list)
-        labels = {
-            key: format_label_value(value_list)
-            for key, value_list in label_dict.items()
-        }
+        if metric_name not in metric_dict:
+            metric_dict[metric_name] = (tuple(label_dict.keys()), {})
 
-        if metric_name not in gauges:
-            gauges[metric_name] = Gauge(metric_name, '', labels.keys())
-        gauge = gauges[metric_name]
+        label_keys = metric_dict[metric_name][0]
+        label_values = tuple([
+            format_label_value(label_dict[key])
+            for key in label_keys
+        ])
 
-        if labels:
-            gauge.labels(labels).set(value)
+        metric_dict[metric_name][1][label_values] = value
+
+    for metric_name, (label_keys, value_dict) in metric_dict.items():
+        if metric_name in gauges:
+            (old_label_values_set, gauge) = gauges[metric_name]
         else:
-            gauge.set(value)
+            old_label_values_set = set()
+            gauge = Gauge(metric_name, '', label_keys)
+
+        new_label_values_set = set(value_dict.keys())
+
+        for label_values in old_label_values_set - new_label_values_set:
+            gauge.remove(*label_values)
+
+        for label_values, value in value_dict.items():
+            if label_values:
+                gauge.labels(*label_values).set(value)
+            else:
+                gauge.set(value)
+
+        gauges[metric_name] = (new_label_values_set, gauge)
 
 def run_query(query):
     response = client.search(body=query)
