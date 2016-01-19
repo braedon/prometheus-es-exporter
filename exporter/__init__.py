@@ -51,10 +51,6 @@ def update_gauges(metrics):
 
         gauges[metric_name] = (new_label_values_set, gauge)
 
-def run_query(query):
-    response = client.search(body=query)
-    return parse_response(response)
-
 def run_scheduler(scheduler, es_client, name, interval, query):
     def scheduled_run(scheduled_time, interval):
         try:
