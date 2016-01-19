@@ -57,9 +57,13 @@ def run_query(query):
 
 def run_scheduler(scheduler, es_client, name, interval, query):
     def scheduled_run(scheduled_time, interval):
-        response = es_client.search(body=query)
-        metrics = parse_response(response, [name])
-        update_gauges(metrics)
+        try:
+            response = es_client.search(body=query)
+        except Exception as ex:
+            pass
+        else:
+            metrics = parse_response(response, [name])
+            update_gauges(metrics)
 
         next_scheduled_time = scheduled_time + interval
         scheduler.enterabs(
