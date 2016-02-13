@@ -8,4 +8,6 @@ COPY LICENSE /usr/src/app/
 
 RUN pip install -e .
 
-CMD ["python", "-u", "/usr/local/bin/prometheus-es-exporter"]
+EXPOSE 8080
+
+ENTRYPOINT ["python", "-u", "/usr/local/bin/prometheus-es-exporter"]

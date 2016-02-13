@@ -1,3 +1,4 @@
+import argparse
 import configparser
 import json
 import sched
@@ -78,11 +79,20 @@ def run_scheduler(scheduler, es_client, name, interval, query):
     )
 
 def main():
-    config = configparser.ConfigParser()
-    config.read('exporter.cfg')
+    parser = argparse.ArgumentParser(description='Export ES query results to Prometheus.')
+    parser.add_argument('-e', '--es-cluster', default='localhost',
+        help='addresses of nodes in a Elasticsearch cluster to run queries on. Nodes should be separated by commas e.g. es1,es2. Ports can be provided if non-standard (9200) e.g. es1:9999 (default: localhost)')
+    parser.add_argument('-p', '--port', type=int, default=8080,
+        help='port to serve the metrics endpoint on. (default: 8080)')
+    parser.add_argument('-c', '--config-file', default='exporter.cfg',
+        help='path to query config file. Can be absolute, or relative to the current working directory. (default: exporter.cfg)')
+    args = parser.parse_args()
 
-    port = config.getint('exporter', 'Port')
-    es_hosts = config.get('elasticsearch', 'Hosts').split(',')
+    port = args.port
+    es_cluster = args.es_cluster.split(',')
+
+    config = configparser.ConfigParser()
+    config.read(args.config_file)
 
     query_prefix = 'query_'
     queries = {}
@@ -94,7 +104,7 @@ def main():
 
             queries[query_name] = (query_interval, query)
 
-    es_client = Elasticsearch(es_hosts)
+    es_client = Elasticsearch(es_cluster)
 
     scheduler = sched.scheduler()
 
