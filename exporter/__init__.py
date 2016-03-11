@@ -53,7 +53,7 @@ def update_gauges(metrics):
         gauges[metric_name] = (new_label_values_set, gauge)
 
 def run_scheduler(scheduler, es_client, name, interval, query):
-    def scheduled_run(scheduled_time, interval):
+    def scheduled_run(scheduled_time,):
         try:
             response = es_client.search(body=query)
         except Exception as ex:
@@ -67,7 +67,7 @@ def run_scheduler(scheduler, es_client, name, interval, query):
             next_scheduled_time,
             1,
             scheduled_run,
-            (next_scheduled_time, interval)
+            (next_scheduled_time,)
         )
 
     next_scheduled_time = time.monotonic()
@@ -75,7 +75,7 @@ def run_scheduler(scheduler, es_client, name, interval, query):
         next_scheduled_time,
         1,
         scheduled_run,
-        (next_scheduled_time, interval)
+        (next_scheduled_time,)
     )
 
 def main():
