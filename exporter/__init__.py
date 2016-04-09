@@ -52,10 +52,10 @@ def update_gauges(metrics):
 
         gauges[metric_name] = (new_label_values_set, gauge)
 
-def run_scheduler(scheduler, es_client, name, interval, query):
+def run_scheduler(scheduler, es_client, name, interval, indices, query):
     def scheduled_run(scheduled_time,):
         try:
-            response = es_client.search(body=query)
+            response = es_client.search(index=indices, body=query)
         except Exception as ex:
             pass
         else:
@@ -100,9 +100,10 @@ def main():
         if section.startswith(query_prefix):
             query_name = section[len(query_prefix):]
             query_interval = config.getfloat(section, 'QueryIntervalSecs')
+            query_indices = config.get(section, 'QueryIndices', fallback='_all')
             query = json.loads(config.get(section, 'QueryJson'))
 
-            queries[query_name] = (query_interval, query)
+            queries[query_name] = (query_interval, query_indices, query)
 
     es_client = Elasticsearch(es_cluster)
 
@@ -112,8 +113,8 @@ def main():
     start_http_server(port)
     print('Server started on port {}'.format(port))
 
-    for name, (interval, query) in queries.items():
-        run_scheduler(scheduler, es_client, name, interval, query)
+    for name, (interval, indices, query) in queries.items():
+        run_scheduler(scheduler, es_client, name, interval, indices, query)
 
     try:
         scheduler.run()
