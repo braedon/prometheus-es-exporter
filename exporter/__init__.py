@@ -62,7 +62,11 @@ def run_scheduler(scheduler, es_client, name, interval, indices, query):
             metrics = parse_response(response, [name])
             update_gauges(metrics)
 
+        current_time = time.monotonic()
         next_scheduled_time = scheduled_time + interval
+        while next_scheduled_time < current_time:
+            next_scheduled_time += interval
+
         scheduler.enterabs(
             next_scheduled_time,
             1,
