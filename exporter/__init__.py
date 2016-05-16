@@ -1,6 +1,7 @@
 import argparse
 import configparser
 import json
+import logging
 import sched
 import time
 
@@ -56,10 +57,11 @@ def run_scheduler(scheduler, es_client, name, interval, indices, query):
     def scheduled_run(scheduled_time,):
         try:
             response = es_client.search(index=indices, body=query)
-        except Exception as ex:
-            pass
-        else:
+
             metrics = parse_response(response, [name])
+        except Exception:
+            logging.exception('Error while querying indices [%s], query [%s].', indices, query)
+        else:
             update_gauges(metrics)
 
         current_time = time.monotonic()
@@ -90,7 +92,15 @@ def main():
         help='port to serve the metrics endpoint on. (default: 8080)')
     parser.add_argument('-c', '--config-file', default='exporter.cfg',
         help='path to query config file. Can be absolute, or relative to the current working directory. (default: exporter.cfg)')
+    parser.add_argument('-v', '--verbose', action='store_true',
+        help='turn on verbose logging.')
     args = parser.parse_args()
+
+    logging.basicConfig(
+        format='[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s',
+        level=logging.DEBUG if args.verbose else logging.INFO
+    )
+    logging.captureWarnings(True)
 
     port = args.port
     es_cluster = args.es_cluster.split(',')
@@ -113,9 +123,9 @@ def main():
 
     scheduler = sched.scheduler()
 
-    print('Starting server...')
+    logging.info('Starting server...')
     start_http_server(port)
-    print('Server started on port {}'.format(port))
+    logging.info('Server started on port %s', port)
 
     for name, (interval, indices, query) in queries.items():
         run_scheduler(scheduler, es_client, name, interval, indices, query)
@@ -125,4 +135,4 @@ def main():
     except KeyboardInterrupt:
         pass
 
-    print('Shutting down')
+    logging.info('Shutting down')
