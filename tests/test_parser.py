@@ -1,7 +1,7 @@
 import unittest
 
-from exporter import format_metric_name, format_label_value
-from exporter.parser import parse_response
+from prometheus_es_exporter import format_metric_name, format_label_value
+from prometheus_es_exporter.parser import parse_response
 
 def format_label(key, value_list):
     return key + '="' + format_label_value(value_list) + '"'

@@ -25,7 +25,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'prometheus-es-exporter=exporter:main',
+            'prometheus-es-exporter=prometheus_es_exporter:main',
         ],
     },
 )

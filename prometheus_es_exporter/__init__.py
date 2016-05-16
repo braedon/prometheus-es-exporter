@@ -8,7 +8,7 @@ import time
 from elasticsearch import Elasticsearch
 from prometheus_client import start_http_server, Gauge
 
-from exporter.parser import parse_response
+from prometheus_es_exporter.parser import parse_response
 
 gauges = {}
 
