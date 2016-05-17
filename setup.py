@@ -2,14 +2,14 @@ from setuptools import setup, find_packages
 
 setup(
     name='prometheus-es-exporter',
-    version='0.1.0.dev1',
+    version='0.1.0',
     description='Elasticsearch query Prometheus exporter',
     url='https://github.com/Braedon/prometheus-es-exporter',
     author='Braedon Vickers',
     author_email='braedon.vickers@gmal.com',
     license='MIT',
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Intended Audience :: System Administrators',
         'Topic :: System :: Monitoring',
