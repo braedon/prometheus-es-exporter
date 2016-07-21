@@ -106,7 +106,7 @@ def main():
     es_cluster = args.es_cluster.split(',')
 
     config = configparser.ConfigParser()
-    config.read(args.config_file)
+    config.read_file(open(args.config_file))
 
     query_prefix = 'query_'
     queries = {}
