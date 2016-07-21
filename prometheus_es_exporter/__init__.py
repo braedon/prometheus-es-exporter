@@ -119,20 +119,24 @@ def main():
 
             queries[query_name] = (query_interval, query_indices, query)
 
-    es_client = Elasticsearch(es_cluster)
+    if queries:
+      es_client = Elasticsearch(es_cluster)
 
-    scheduler = sched.scheduler()
+      scheduler = sched.scheduler()
 
-    logging.info('Starting server...')
-    start_http_server(port)
-    logging.info('Server started on port %s', port)
+      logging.info('Starting server...')
+      start_http_server(port)
+      logging.info('Server started on port %s', port)
 
-    for name, (interval, indices, query) in queries.items():
-        run_scheduler(scheduler, es_client, name, interval, indices, query)
+      for name, (interval, indices, query) in queries.items():
+          run_scheduler(scheduler, es_client, name, interval, indices, query)
 
-    try:
-        scheduler.run()
-    except KeyboardInterrupt:
-        pass
+      try:
+          scheduler.run()
+      except KeyboardInterrupt:
+          pass
+
+    else:
+      logging.warn('No queries found in config file %s', args.config_file)
 
     logging.info('Shutting down')
