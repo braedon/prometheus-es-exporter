@@ -13,10 +13,10 @@ from prometheus_es_exporter.parser import parse_response
 gauges = {}
 
 def format_label_value(value_list):
-    return '_'.join(value_list)
+    return '_'.join(value_list).replace('.', '_')
 
 def format_metric_name(name_list):
-    return '_'.join(name_list)
+    return '_'.join(name_list).replace('.', '_')
 
 def update_gauges(metrics):
     metric_dict = {}
