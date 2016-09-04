@@ -4,7 +4,7 @@ This Prometheus exporter periodically runs configured queries against an Elastic
 
 Values are parsed out of the Elasticsearch results automatically, with the path through the JSON to the value being used to construct metric names.
 
-Metrics are only extracted from aggregation results, with the exception of the query doc count. The keys of any buckets are converted to labels, rather than being inserted into the metric name. See `tests/test_parser.py` for all the supported queries/metrics.
+Metrics are only extracted from aggregation results, with the exception of the query doc count. The keys of any buckets are converted to labels, rather than being inserted into the metric name. See [tests/test_parser.py](tests/test_parser.py) for all the supported queries/metrics.
 
 # Installation
 The exporter requires Python 3 and Pip 3 to be installed.
@@ -24,7 +24,7 @@ By default, it will bind to port 8080, query Elasticsearch on `localhost:9200` a
 ```
 Run with the `-h` flag to see details on all the available options.
 
-See the provided `exporter.cfg` file for query configuration examples and explanation.
+See the provided [exporter.cfg](exporter.cfg) file for query configuration examples and explanation.
 
 # Docker
 Docker images for released versions can be found on Docker Hub (note that no `latest` version is provided):
