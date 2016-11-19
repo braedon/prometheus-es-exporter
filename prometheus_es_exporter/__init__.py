@@ -3,6 +3,8 @@ import configparser
 import json
 import logging
 import sched
+import signal
+import sys
 import time
 
 from elasticsearch import Elasticsearch
@@ -84,7 +86,16 @@ def run_scheduler(scheduler, es_client, name, interval, indices, query):
         (next_scheduled_time,)
     )
 
+def shutdown():
+    logging.info('Shutting down')
+    sys.exit(1)
+
+def signal_handler(signum, frame):
+    shutdown()
+
 def main():
+    signal.signal(signal.SIGTERM, signal_handler)
+
     parser = argparse.ArgumentParser(description='Export ES query results to Prometheus.')
     parser.add_argument('-e', '--es-cluster', default='localhost',
         help='addresses of nodes in a Elasticsearch cluster to run queries on. Nodes should be separated by commas e.g. es1,es2. Ports can be provided if non-standard (9200) e.g. es1:9999 (default: localhost)')
@@ -139,4 +150,4 @@ def main():
     else:
       logging.warn('No queries found in config file %s', args.config_file)
 
-    logging.info('Shutting down')
+    shutdown()
