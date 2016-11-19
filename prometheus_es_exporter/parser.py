@@ -5,7 +5,7 @@ def parse_buckets(buckets, metric=[], labels={}):
         labels_next = labels.copy()
 
         if 'key' in bucket.keys():
-            bucket_key = bucket['key']
+            bucket_key = str(bucket['key'])
             if 'bucket' in labels_next.keys():
                 labels_next['bucket'] = labels_next['bucket'] + [bucket_key]
             else:

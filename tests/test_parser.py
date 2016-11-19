@@ -516,6 +516,83 @@ class Test(unittest.TestCase):
         result = convert_result(parse_response(response))
         self.assertEqual(result, expected)
 
+    def test_terms_numeric(self):
+        # Query:
+        # {
+        #     'size': 0,
+        #     'query': {
+        #         'match_all': {}
+        #     },
+        #     'aggs': {
+        #         'val_terms': {
+        #             'terms': {'field': 'val'},
+        #             'aggs': {
+        #                 'val_sum': {
+        #                     'sum': {'field': 'val'}
+        #                 }
+        #             }
+        #         }
+        #     }
+        # }
+        response = {
+            "_shards" : {
+                "total" : 5,
+                "successful" : 5,
+                "failed" : 0
+            },
+            "aggregations" : {
+                "val_terms" : {
+                    "doc_count_error_upper_bound" : 0,
+                    "sum_other_doc_count" : 0,
+                    "buckets" : [
+                        {
+                            "key" : 1,
+                            "doc_count" : 1,
+                            "val_sum" : {
+                                "value" : 1.0
+                            }
+                        },
+                        {
+                            "key" : 2,
+                            "doc_count" : 1,
+                            "val_sum" : {
+                              "value" : 2.0
+                            }
+                        },
+                        {
+                            "key" : 3,
+                            "doc_count" : 1,
+                            "val_sum" : {
+                                "value" : 3.0
+                            }
+                        }
+                    ]
+                }
+            },
+            "hits" : {
+                "total" : 3,
+                "max_score" : 0.0,
+                "hits" : []
+            },
+            "timed_out" : False,
+            "took" : 4
+        }
+
+
+        expected = {
+            'hits': 3,
+            'val_terms_doc_count_error_upper_bound': 0,
+            'val_terms_sum_other_doc_count': 0,
+            'val_terms_doc_count{bucket="1"}': 1,
+            'val_terms_val_sum_value{bucket="1"}': 1.0,
+            'val_terms_doc_count{bucket="2"}': 1,
+            'val_terms_val_sum_value{bucket="2"}': 2.0,
+            'val_terms_doc_count{bucket="3"}': 1,
+            'val_terms_val_sum_value{bucket="3"}': 3.0
+        }
+        result = convert_result(parse_response(response))
+        self.assertEqual(result, expected)
+
     def test_nested_terms(self):
         # Query:
         # {
