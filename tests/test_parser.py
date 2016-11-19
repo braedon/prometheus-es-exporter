@@ -148,13 +148,13 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
-            'val_percentiles_values_1.0': 1.02,
-            'val_percentiles_values_5.0': 1.1,
-            'val_percentiles_values_25.0': 1.5,
-            'val_percentiles_values_50.0': 2.0,
-            'val_percentiles_values_75.0': 2.5,
-            'val_percentiles_values_95.0': 2.9,
-            'val_percentiles_values_99.0': 2.98
+            'val_percentiles_values_1_0': 1.02,
+            'val_percentiles_values_5_0': 1.1,
+            'val_percentiles_values_25_0': 1.5,
+            'val_percentiles_values_50_0': 2.0,
+            'val_percentiles_values_75_0': 2.5,
+            'val_percentiles_values_95_0': 2.9,
+            'val_percentiles_values_99_0': 2.98
         }
         result = convert_result(parse_response(response))
         self.assertEqual(result, expected)
