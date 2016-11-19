@@ -2,13 +2,14 @@ FROM python:3-slim
 
 WORKDIR /usr/src/app
 
-COPY prometheus_es_exporter/*.py /usr/src/app/prometheus_es_exporter/
 COPY setup.py /usr/src/app/
+RUN pip install .
+
+COPY prometheus_es_exporter/*.py /usr/src/app/prometheus_es_exporter/
+RUN pip install -e .
+
 COPY LICENSE /usr/src/app/
 COPY README.md /usr/src/app/
-COPY MANIFEST.in /usr/src/app/
-
-RUN pip install -e .
 
 EXPOSE 8080
 
