@@ -3,9 +3,12 @@ import configparser
 import json
 import logging
 import sched
+import signal
+import sys
 import time
 
 from elasticsearch import Elasticsearch
+from logstash_formatter import LogstashFormatterV1
 from prometheus_client import start_http_server, Gauge
 
 from prometheus_es_exporter.parser import parse_response
@@ -84,7 +87,16 @@ def run_scheduler(scheduler, es_client, name, interval, indices, query):
         (next_scheduled_time,)
     )
 
+def shutdown():
+    logging.info('Shutting down')
+    sys.exit(1)
+
+def signal_handler(signum, frame):
+    shutdown()
+
 def main():
+    signal.signal(signal.SIGTERM, signal_handler)
+
     parser = argparse.ArgumentParser(description='Export ES query results to Prometheus.')
     parser.add_argument('-e', '--es-cluster', default='localhost',
         help='addresses of nodes in a Elasticsearch cluster to run queries on. Nodes should be separated by commas e.g. es1,es2. Ports can be provided if non-standard (9200) e.g. es1:9999 (default: localhost)')
@@ -92,12 +104,19 @@ def main():
         help='port to serve the metrics endpoint on. (default: 8080)')
     parser.add_argument('-c', '--config-file', default='exporter.cfg',
         help='path to query config file. Can be absolute, or relative to the current working directory. (default: exporter.cfg)')
+    parser.add_argument('-j', '--json-logging', action='store_true',
+        help='turn on json logging.')
     parser.add_argument('-v', '--verbose', action='store_true',
         help='turn on verbose logging.')
     args = parser.parse_args()
 
+    log_handler = logging.StreamHandler()
+    log_format = '[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s'
+    formatter = LogstashFormatterV1() if args.json_logging else logging.Formatter(log_format)
+    log_handler.setFormatter(formatter)
+
     logging.basicConfig(
-        format='[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s',
+        handlers = [log_handler],
         level=logging.DEBUG if args.verbose else logging.INFO
     )
     logging.captureWarnings(True)
@@ -139,4 +158,4 @@ def main():
     else:
       logging.warn('No queries found in config file %s', args.config_file)
 
-    logging.info('Shutting down')
+    shutdown()
