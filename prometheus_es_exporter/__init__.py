@@ -139,7 +139,7 @@ def main():
             queries[query_name] = (query_interval, query_indices, query)
 
     if queries:
-      es_client = Elasticsearch(es_cluster)
+      es_client = Elasticsearch(es_cluster, verify_certs=False)
 
       scheduler = sched.scheduler()
 
