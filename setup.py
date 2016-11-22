@@ -6,7 +6,7 @@ setup(
     description='Elasticsearch query Prometheus exporter',
     url='https://github.com/Braedon/prometheus-es-exporter',
     author='Braedon Vickers',
-    author_email='braedon.vickers@gmal.com',
+    author_email='braedon.vickers@gmail.com',
     license='MIT',
     classifiers=[
         'Development Status :: 4 - Beta',
