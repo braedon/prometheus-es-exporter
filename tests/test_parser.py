@@ -325,7 +325,7 @@ class Test(unittest.TestCase):
         #         'match_all': {}
         #     },
         #     'aggs': {
-        #         'group_filters': {
+        #         'group_filter': {
         #             'filters': {
         #                 'filters': {
         #                     'group_a': {'term': {'group1': 'a'}},
@@ -347,7 +347,7 @@ class Test(unittest.TestCase):
                 "total": 5
             },
             "aggregations": {
-                "group_filters": {
+                "group_filter": {
                     "buckets": {
                         "group_a": {
                             "doc_count": 2,
@@ -375,10 +375,10 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
-            'group_filters_doc_count{bucket="group_a"}': 2,
-            'group_filters_doc_count{bucket="group_b"}': 1,
-            'group_filters_val_sum_value{bucket="group_a"}': 3.0,
-            'group_filters_val_sum_value{bucket="group_b"}': 3.0
+            'group_filter_doc_count{group_filter="group_a"}': 2,
+            'group_filter_doc_count{group_filter="group_b"}': 1,
+            'group_filter_val_sum_value{group_filter="group_a"}': 3.0,
+            'group_filter_val_sum_value{group_filter="group_b"}': 3.0
         }
         result = convert_result(parse_response(response))
         self.assertEqual(result, expected)
@@ -391,7 +391,7 @@ class Test(unittest.TestCase):
         #         'match_all': {}
         #     },
         #     'aggs': {
-        #         'group_filters': {
+        #         'group_filter': {
         #             'filters': {
         #                 'filters': [
         #                     {'term': {'group1': 'a'}},
@@ -413,7 +413,7 @@ class Test(unittest.TestCase):
                 "total": 5
             },
             "aggregations": {
-                "group_filters": {
+                "group_filter": {
                     "buckets": [
                         {
                             "doc_count": 2,
@@ -441,10 +441,10 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
-            'group_filters_doc_count{bucket="filter_0"}': 2,
-            'group_filters_doc_count{bucket="filter_1"}': 1,
-            'group_filters_val_sum_value{bucket="filter_0"}': 3.0,
-            'group_filters_val_sum_value{bucket="filter_1"}': 3.0
+            'group_filter_doc_count{group_filter="filter_0"}': 2,
+            'group_filter_doc_count{group_filter="filter_1"}': 1,
+            'group_filter_val_sum_value{group_filter="filter_0"}': 3.0,
+            'group_filter_val_sum_value{group_filter="filter_1"}': 3.0
         }
         result = convert_result(parse_response(response))
         self.assertEqual(result, expected)
@@ -457,7 +457,7 @@ class Test(unittest.TestCase):
         #         'match_all': {}
         #     },
         #     'aggs': {
-        #         'group1_terms': {
+        #         'group1_term': {
         #             'terms': {'field': 'group1'},
         #             'aggs': {
         #                 'val_sum': {
@@ -474,7 +474,7 @@ class Test(unittest.TestCase):
                 "total": 5
             },
             "aggregations": {
-                "group1_terms": {
+                "group1_term": {
                     "buckets": [
                         {
                             "doc_count": 2,
@@ -506,12 +506,12 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
-            'group1_terms_doc_count_error_upper_bound': 0,
-            'group1_terms_sum_other_doc_count': 0,
-            'group1_terms_doc_count{bucket="a"}': 2,
-            'group1_terms_val_sum_value{bucket="a"}': 3.0,
-            'group1_terms_doc_count{bucket="b"}': 1,
-            'group1_terms_val_sum_value{bucket="b"}': 3.0
+            'group1_term_doc_count_error_upper_bound': 0,
+            'group1_term_sum_other_doc_count': 0,
+            'group1_term_doc_count{group1_term="a"}': 2,
+            'group1_term_val_sum_value{group1_term="a"}': 3.0,
+            'group1_term_doc_count{group1_term="b"}': 1,
+            'group1_term_val_sum_value{group1_term="b"}': 3.0
         }
         result = convert_result(parse_response(response))
         self.assertEqual(result, expected)
@@ -583,12 +583,12 @@ class Test(unittest.TestCase):
             'hits': 3,
             'val_terms_doc_count_error_upper_bound': 0,
             'val_terms_sum_other_doc_count': 0,
-            'val_terms_doc_count{bucket="1"}': 1,
-            'val_terms_val_sum_value{bucket="1"}': 1.0,
-            'val_terms_doc_count{bucket="2"}': 1,
-            'val_terms_val_sum_value{bucket="2"}': 2.0,
-            'val_terms_doc_count{bucket="3"}': 1,
-            'val_terms_val_sum_value{bucket="3"}': 3.0
+            'val_terms_doc_count{val_terms="1"}': 1,
+            'val_terms_val_sum_value{val_terms="1"}': 1.0,
+            'val_terms_doc_count{val_terms="2"}': 1,
+            'val_terms_val_sum_value{val_terms="2"}': 2.0,
+            'val_terms_doc_count{val_terms="3"}': 1,
+            'val_terms_val_sum_value{val_terms="3"}': 3.0
         }
         result = convert_result(parse_response(response))
         self.assertEqual(result, expected)
@@ -601,13 +601,13 @@ class Test(unittest.TestCase):
         #         'match_all': {}
         #     },
         #     'aggs': {
-        #         'group1_terms': {
+        #         'group1_term': {
         #             'terms': {'field': 'group1'},
         #             'aggs': {
         #                 'val_sum': {
         #                     'sum': {'field': 'val'}
         #                 },
-        #                 'group2_terms': {
+        #                 'group2_term': {
         #                     'terms': {'field': 'group2'},
         #                     'aggs': {
         #                         'val_sum': {
@@ -626,11 +626,11 @@ class Test(unittest.TestCase):
                 "total": 5
             },
             "aggregations": {
-                "group1_terms": {
+                "group1_term": {
                     "buckets": [
                         {
                             "doc_count": 2,
-                            "group2_terms": {
+                            "group2_term": {
                                 "buckets": [
                                     {
                                         "doc_count": 1,
@@ -657,7 +657,7 @@ class Test(unittest.TestCase):
                         },
                         {
                             "doc_count": 1,
-                            "group2_terms": {
+                            "group2_term": {
                                 "buckets": [
                                     {
                                         "doc_count": 1,
@@ -691,22 +691,22 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
-            'group1_terms_doc_count_error_upper_bound': 0,
-            'group1_terms_sum_other_doc_count': 0,
-            'group1_terms_doc_count{bucket="a"}': 2,
-            'group1_terms_val_sum_value{bucket="a"}': 3.0,
-            'group1_terms_group2_terms_doc_count_error_upper_bound{bucket="a"}': 0,
-            'group1_terms_group2_terms_sum_other_doc_count{bucket="a"}': 0,
-            'group1_terms_group2_terms_doc_count{bucket="a_a"}': 1,
-            'group1_terms_group2_terms_val_sum_value{bucket="a_a"}': 1.0,
-            'group1_terms_group2_terms_doc_count{bucket="a_b"}': 1,
-            'group1_terms_group2_terms_val_sum_value{bucket="a_b"}': 2.0,
-            'group1_terms_doc_count{bucket="b"}': 1,
-            'group1_terms_val_sum_value{bucket="b"}': 3.0,
-            'group1_terms_group2_terms_doc_count_error_upper_bound{bucket="b"}': 0,
-            'group1_terms_group2_terms_sum_other_doc_count{bucket="b"}': 0,
-            'group1_terms_group2_terms_doc_count{bucket="b_b"}': 1,
-            'group1_terms_group2_terms_val_sum_value{bucket="b_b"}': 3.0,
+            'group1_term_doc_count_error_upper_bound': 0,
+            'group1_term_sum_other_doc_count': 0,
+            'group1_term_doc_count{group1_term="a"}': 2,
+            'group1_term_val_sum_value{group1_term="a"}': 3.0,
+            'group1_term_group2_term_doc_count_error_upper_bound{group1_term="a"}': 0,
+            'group1_term_group2_term_sum_other_doc_count{group1_term="a"}': 0,
+            'group1_term_group2_term_doc_count{group1_term="a",group2_term="a"}': 1,
+            'group1_term_group2_term_val_sum_value{group1_term="a",group2_term="a"}': 1.0,
+            'group1_term_group2_term_doc_count{group1_term="a",group2_term="b"}': 1,
+            'group1_term_group2_term_val_sum_value{group1_term="a",group2_term="b"}': 2.0,
+            'group1_term_doc_count{group1_term="b"}': 1,
+            'group1_term_val_sum_value{group1_term="b"}': 3.0,
+            'group1_term_group2_term_doc_count_error_upper_bound{group1_term="b"}': 0,
+            'group1_term_group2_term_sum_other_doc_count{group1_term="b"}': 0,
+            'group1_term_group2_term_doc_count{group1_term="b",group2_term="b"}': 1,
+            'group1_term_group2_term_val_sum_value{group1_term="b",group2_term="b"}': 3.0,
         }
         result = convert_result(parse_response(response))
         self.assertEqual(result, expected)
