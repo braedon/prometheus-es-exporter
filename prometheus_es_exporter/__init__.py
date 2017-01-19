@@ -13,6 +13,7 @@ from logstash_formatter import LogstashFormatterV1
 from prometheus_client import start_http_server, Gauge
 
 from prometheus_es_exporter.parser import parse_response
+from prometheus_es_exporter import cluster_health_parser
 
 gauges = {}
 
@@ -72,6 +73,17 @@ def run_query(es_client, name, indices, query):
         update_gauges(metrics)
 
 
+def get_cluster_health(es_client, level):
+    try:
+        response = es_client.cluster.health(level=level)
+
+        metrics = cluster_health_parser.parse_response(response, ['cluster_health'])
+    except Exception:
+        logging.exception('Error while querying indices cluster health.')
+    else:
+        update_gauges(metrics)
+
+
 def run_scheduler(scheduler, interval, func):
     def scheduled_run(scheduled_time,):
         try:
@@ -119,6 +131,10 @@ def main():
                         help='port to serve the metrics endpoint on. (default: 8080)')
     parser.add_argument('-c', '--config-file', default='exporter.cfg',
                         help='path to query config file. Can be absolute, or relative to the current working directory. (default: exporter.cfg)')
+    parser.add_argument('--cluster-health-interval', type=float, default=15,
+                        help='polling interval for cluster health monitoring in seconds. (default: 15)')
+    parser.add_argument('--cluster-health-level', default='indices', choices=['none', 'cluster', 'indices', 'shards'],
+                        help='level of detail for cluster health monitoring. Select \'none\' to disable. (default: indices)')
     parser.add_argument('-j', '--json-logging', action='store_true',
                         help='turn on json logging.')
     parser.add_argument('-v', '--verbose', action='store_true',
@@ -138,6 +154,11 @@ def main():
 
     port = args.port
     es_cluster = args.es_cluster.split(',')
+
+    cluster_health_interval = args.cluster_health_interval
+    cluster_health_level = args.cluster_health_level
+    if cluster_health_level == 'none':
+        cluster_health_level = None
 
     config = configparser.ConfigParser()
     config.read_file(open(args.config_file))
@@ -165,6 +186,10 @@ def main():
         for name, (interval, indices, query) in queries.items():
             func = partial(run_query, es_client, name, indices, query)
             run_scheduler(scheduler, interval, func)
+
+        if cluster_health_level:
+            cluster_health_func = partial(get_cluster_health, es_client, cluster_health_level)
+            run_scheduler(scheduler, cluster_health_interval, cluster_health_func)
 
         try:
             scheduler.run()
