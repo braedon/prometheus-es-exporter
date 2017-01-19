@@ -8,6 +8,7 @@ import sys
 import time
 
 from elasticsearch import Elasticsearch
+from functools import partial
 from logstash_formatter import LogstashFormatterV1
 from prometheus_client import start_http_server, Gauge
 
@@ -56,16 +57,24 @@ def update_gauges(metrics):
 
         gauges[metric_name] = (new_label_values_set, gauge)
 
-def run_scheduler(scheduler, es_client, name, interval, indices, query):
+
+def run_query(es_client, name, indices, query):
+    try:
+        response = es_client.search(index=indices, body=query)
+
+        metrics = parse_response(response, [name])
+    except Exception:
+        logging.exception('Error while querying indices [%s], query [%s].', indices, query)
+    else:
+        update_gauges(metrics)
+
+
+def run_scheduler(scheduler, interval, func):
     def scheduled_run(scheduled_time,):
         try:
-            response = es_client.search(index=indices, body=query)
-
-            metrics = parse_response(response, [name])
+            func()
         except Exception:
-            logging.exception('Error while querying indices [%s], query [%s].', indices, query)
-        else:
-            update_gauges(metrics)
+            logging.exception('Error while running scheduled job.')
 
         current_time = time.monotonic()
         next_scheduled_time = scheduled_time + interval
@@ -148,7 +157,8 @@ def main():
       logging.info('Server started on port %s', port)
 
       for name, (interval, indices, query) in queries.items():
-          run_scheduler(scheduler, es_client, name, interval, indices, query)
+          func = partial(run_query, es_client, name, indices, query)
+          run_scheduler(scheduler, interval, func)
 
       try:
           scheduler.run()
