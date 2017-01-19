@@ -16,11 +16,14 @@ from prometheus_es_exporter.parser import parse_response
 
 gauges = {}
 
+
 def format_label_value(value_list):
     return '_'.join(value_list).replace('.', '_')
 
+
 def format_metric_name(name_list):
     return '_'.join(name_list).replace('.', '_')
+
 
 def update_gauges(metrics):
     metric_dict = {}
@@ -96,27 +99,30 @@ def run_scheduler(scheduler, interval, func):
         (next_scheduled_time,)
     )
 
+
 def shutdown():
     logging.info('Shutting down')
     sys.exit(1)
 
+
 def signal_handler(signum, frame):
     shutdown()
+
 
 def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
     parser = argparse.ArgumentParser(description='Export ES query results to Prometheus.')
     parser.add_argument('-e', '--es-cluster', default='localhost',
-        help='addresses of nodes in a Elasticsearch cluster to run queries on. Nodes should be separated by commas e.g. es1,es2. Ports can be provided if non-standard (9200) e.g. es1:9999 (default: localhost)')
+                        help='addresses of nodes in a Elasticsearch cluster to run queries on. Nodes should be separated by commas e.g. es1,es2. Ports can be provided if non-standard (9200) e.g. es1:9999 (default: localhost)')
     parser.add_argument('-p', '--port', type=int, default=8080,
-        help='port to serve the metrics endpoint on. (default: 8080)')
+                        help='port to serve the metrics endpoint on. (default: 8080)')
     parser.add_argument('-c', '--config-file', default='exporter.cfg',
-        help='path to query config file. Can be absolute, or relative to the current working directory. (default: exporter.cfg)')
+                        help='path to query config file. Can be absolute, or relative to the current working directory. (default: exporter.cfg)')
     parser.add_argument('-j', '--json-logging', action='store_true',
-        help='turn on json logging.')
+                        help='turn on json logging.')
     parser.add_argument('-v', '--verbose', action='store_true',
-        help='turn on verbose logging.')
+                        help='turn on verbose logging.')
     args = parser.parse_args()
 
     log_handler = logging.StreamHandler()
@@ -125,7 +131,7 @@ def main():
     log_handler.setFormatter(formatter)
 
     logging.basicConfig(
-        handlers = [log_handler],
+        handlers=[log_handler],
         level=logging.DEBUG if args.verbose else logging.INFO
     )
     logging.captureWarnings(True)
@@ -148,24 +154,24 @@ def main():
             queries[query_name] = (query_interval, query_indices, query)
 
     if queries:
-      es_client = Elasticsearch(es_cluster, verify_certs=False)
+        es_client = Elasticsearch(es_cluster, verify_certs=False)
 
-      scheduler = sched.scheduler()
+        scheduler = sched.scheduler()
 
-      logging.info('Starting server...')
-      start_http_server(port)
-      logging.info('Server started on port %s', port)
+        logging.info('Starting server...')
+        start_http_server(port)
+        logging.info('Server started on port %s', port)
 
-      for name, (interval, indices, query) in queries.items():
-          func = partial(run_query, es_client, name, indices, query)
-          run_scheduler(scheduler, interval, func)
+        for name, (interval, indices, query) in queries.items():
+            func = partial(run_query, es_client, name, indices, query)
+            run_scheduler(scheduler, interval, func)
 
-      try:
-          scheduler.run()
-      except KeyboardInterrupt:
-          pass
+        try:
+            scheduler.run()
+        except KeyboardInterrupt:
+            pass
 
     else:
-      logging.warn('No queries found in config file %s', args.config_file)
+        logging.warn('No queries found in config file %s', args.config_file)
 
     shutdown()

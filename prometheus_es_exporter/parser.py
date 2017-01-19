@@ -22,6 +22,7 @@ def parse_buckets(agg_key, buckets, metric=[], labels={}):
 
     return result
 
+
 def parse_buckets_fixed(agg_key, buckets, metric=[], labels={}):
     result = []
 
@@ -37,6 +38,7 @@ def parse_buckets_fixed(agg_key, buckets, metric=[], labels={}):
 
     return result
 
+
 def parse_agg(agg_key, agg, metric=[], labels={}):
     result = []
 
@@ -51,6 +53,7 @@ def parse_agg(agg_key, agg, metric=[], labels={}):
             result.append((metric + [key], labels, value))
 
     return result
+
 
 def parse_response(response, metric=[]):
     result = []
