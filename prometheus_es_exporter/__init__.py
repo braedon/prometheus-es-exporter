@@ -141,6 +141,8 @@ def main():
                         help='addresses of nodes in a Elasticsearch cluster to run queries on. Nodes should be separated by commas e.g. es1,es2. Ports can be provided if non-standard (9200) e.g. es1:9999 (default: localhost)')
     parser.add_argument('-p', '--port', type=int, default=8080,
                         help='port to serve the metrics endpoint on. (default: 8080)')
+    parser.add_argument('--query-disable', action='store_true',
+                        help='disable query monitoring. Config file does not need to be present if query monitoring is disabled.')
     parser.add_argument('-c', '--config-file', default='exporter.cfg',
                         help='path to query config file. Can be absolute, or relative to the current working directory. (default: exporter.cfg)')
     parser.add_argument('--cluster-health-disable', action='store_true',
@@ -172,48 +174,47 @@ def main():
 
     port = args.port
     es_cluster = args.es_cluster.split(',')
+    es_client = Elasticsearch(es_cluster, verify_certs=False)
 
-    config = configparser.ConfigParser()
-    config.read_file(open(args.config_file))
+    scheduler = sched.scheduler()
 
-    query_prefix = 'query_'
-    queries = {}
-    for section in config.sections():
-        if section.startswith(query_prefix):
-            query_name = section[len(query_prefix):]
-            query_interval = config.getfloat(section, 'QueryIntervalSecs')
-            query_indices = config.get(section, 'QueryIndices', fallback='_all')
-            query = json.loads(config.get(section, 'QueryJson'))
+    if not args.query_disable:
+        config = configparser.ConfigParser()
+        config.read_file(open(args.config_file))
 
-            queries[query_name] = (query_interval, query_indices, query)
+        query_prefix = 'query_'
+        queries = {}
+        for section in config.sections():
+            if section.startswith(query_prefix):
+                query_name = section[len(query_prefix):]
+                query_interval = config.getfloat(section, 'QueryIntervalSecs')
+                query_indices = config.get(section, 'QueryIndices', fallback='_all')
+                query = json.loads(config.get(section, 'QueryJson'))
 
-    if queries:
-        es_client = Elasticsearch(es_cluster, verify_certs=False)
+                queries[query_name] = (query_interval, query_indices, query)
 
-        scheduler = sched.scheduler()
+        if queries:
+            for name, (interval, indices, query) in queries.items():
+                func = partial(run_query, es_client, name, indices, query)
+                run_scheduler(scheduler, interval, func)
+        else:
+            logging.warn('No queries found in config file %s', args.config_file)
 
-        logging.info('Starting server...')
-        start_http_server(port)
-        logging.info('Server started on port %s', port)
+    if not args.cluster_health_disable:
+        cluster_health_func = partial(get_cluster_health, es_client, args.cluster_health_level)
+        run_scheduler(scheduler, args.cluster_health_interval, cluster_health_func)
 
-        for name, (interval, indices, query) in queries.items():
-            func = partial(run_query, es_client, name, indices, query)
-            run_scheduler(scheduler, interval, func)
+    if not args.nodes_stats_disable:
+        nodes_stats_func = partial(get_nodes_stats, es_client)
+        run_scheduler(scheduler, args.nodes_stats_interval, nodes_stats_func)
 
-        if not args.cluster_health_disable:
-            cluster_health_func = partial(get_cluster_health, es_client, args.cluster_health_level)
-            run_scheduler(scheduler, args.cluster_health_interval, cluster_health_func)
+    logging.info('Starting server...')
+    start_http_server(port)
+    logging.info('Server started on port %s', port)
 
-        if not args.nodes_stats_disable:
-            nodes_stats_func = partial(get_nodes_stats, es_client)
-            run_scheduler(scheduler, args.nodes_stats_interval, nodes_stats_func)
-
-        try:
-            scheduler.run()
-        except KeyboardInterrupt:
-            pass
-
-    else:
-        logging.warn('No queries found in config file %s', args.config_file)
+    try:
+        scheduler.run()
+    except KeyboardInterrupt:
+        pass
 
     shutdown()
