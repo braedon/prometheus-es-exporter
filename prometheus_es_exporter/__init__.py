@@ -13,6 +13,7 @@ from logstash_formatter import LogstashFormatterV1
 from prometheus_client import start_http_server, Gauge
 
 from prometheus_es_exporter import cluster_health_parser
+from prometheus_es_exporter import nodes_stats_parser
 from prometheus_es_exporter.parser import parse_response
 
 gauges = {}
@@ -84,6 +85,17 @@ def get_cluster_health(es_client, level):
         update_gauges(metrics)
 
 
+def get_nodes_stats(es_client):
+    try:
+        response = es_client.nodes.stats()
+
+        metrics = nodes_stats_parser.parse_response(response, ['nodes_stats'])
+    except Exception:
+        logging.exception('Error while fetching nodes stats.')
+    else:
+        update_gauges(metrics)
+
+
 def run_scheduler(scheduler, interval, func):
     def scheduled_run(scheduled_time,):
         try:
@@ -137,6 +149,10 @@ def main():
                         help='polling interval for cluster health monitoring in seconds. (default: 10)')
     parser.add_argument('--cluster-health-level', default='indices', choices=['cluster', 'indices', 'shards'],
                         help='level of detail for cluster health monitoring.  (default: indices)')
+    parser.add_argument('--nodes-stats-disable', action='store_true',
+                        help='disable nodes stats monitoring.')
+    parser.add_argument('--nodes-stats-interval', type=float, default=10,
+                        help='polling interval for nodes stats monitoring in seconds. (default: 10)')
     parser.add_argument('-j', '--json-logging', action='store_true',
                         help='turn on json logging.')
     parser.add_argument('-v', '--verbose', action='store_true',
@@ -187,6 +203,10 @@ def main():
         if not args.cluster_health_disable:
             cluster_health_func = partial(get_cluster_health, es_client, args.cluster_health_level)
             run_scheduler(scheduler, args.cluster_health_interval, cluster_health_func)
+
+        if not args.nodes_stats_disable:
+            nodes_stats_func = partial(get_nodes_stats, es_client)
+            run_scheduler(scheduler, args.nodes_stats_interval, nodes_stats_func)
 
         try:
             scheduler.run()
