@@ -12,8 +12,8 @@ from functools import partial
 from logstash_formatter import LogstashFormatterV1
 from prometheus_client import start_http_server, Gauge
 
-from prometheus_es_exporter.parser import parse_response
 from prometheus_es_exporter import cluster_health_parser
+from prometheus_es_exporter.parser import parse_response
 
 gauges = {}
 
@@ -79,7 +79,7 @@ def get_cluster_health(es_client, level):
 
         metrics = cluster_health_parser.parse_response(response, ['cluster_health'])
     except Exception:
-        logging.exception('Error while querying indices cluster health.')
+        logging.exception('Error while fetching cluster health.')
     else:
         update_gauges(metrics)
 
@@ -131,10 +131,12 @@ def main():
                         help='port to serve the metrics endpoint on. (default: 8080)')
     parser.add_argument('-c', '--config-file', default='exporter.cfg',
                         help='path to query config file. Can be absolute, or relative to the current working directory. (default: exporter.cfg)')
-    parser.add_argument('--cluster-health-interval', type=float, default=15,
-                        help='polling interval for cluster health monitoring in seconds. (default: 15)')
-    parser.add_argument('--cluster-health-level', default='indices', choices=['none', 'cluster', 'indices', 'shards'],
-                        help='level of detail for cluster health monitoring. Select \'none\' to disable. (default: indices)')
+    parser.add_argument('--cluster-health-disable', action='store_true',
+                        help='disable cluster health monitoring.')
+    parser.add_argument('--cluster-health-interval', type=float, default=10,
+                        help='polling interval for cluster health monitoring in seconds. (default: 10)')
+    parser.add_argument('--cluster-health-level', default='indices', choices=['cluster', 'indices', 'shards'],
+                        help='level of detail for cluster health monitoring.  (default: indices)')
     parser.add_argument('-j', '--json-logging', action='store_true',
                         help='turn on json logging.')
     parser.add_argument('-v', '--verbose', action='store_true',
@@ -154,11 +156,6 @@ def main():
 
     port = args.port
     es_cluster = args.es_cluster.split(',')
-
-    cluster_health_interval = args.cluster_health_interval
-    cluster_health_level = args.cluster_health_level
-    if cluster_health_level == 'none':
-        cluster_health_level = None
 
     config = configparser.ConfigParser()
     config.read_file(open(args.config_file))
@@ -187,9 +184,9 @@ def main():
             func = partial(run_query, es_client, name, indices, query)
             run_scheduler(scheduler, interval, func)
 
-        if cluster_health_level:
-            cluster_health_func = partial(get_cluster_health, es_client, cluster_health_level)
-            run_scheduler(scheduler, cluster_health_interval, cluster_health_func)
+        if not args.cluster_health_disable:
+            cluster_health_func = partial(get_cluster_health, es_client, args.cluster_health_level)
+            run_scheduler(scheduler, args.cluster_health_interval, cluster_health_func)
 
         try:
             scheduler.run()

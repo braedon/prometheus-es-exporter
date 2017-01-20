@@ -7,8 +7,6 @@ singular_forms = {
 def parse_block(block, metric=[], labels={}):
     result = []
 
-    block = block.copy()
-
     # Green is 0, so if we add statuses of mutiple blocks together
     # (e.g. all the indices) we don't need to know how many there were
     # to know if things are good.
@@ -21,7 +19,6 @@ def parse_block(block, metric=[], labels={}):
     elif status == 'green':
         status_int = 2
     result.append((metric + ['status'], labels, status_int))
-    del block['status']
 
     for key, value in block.items():
         if isinstance(value, bool):
@@ -42,14 +39,15 @@ def parse_block(block, metric=[], labels={}):
 def parse_response(response, metric=[]):
     result = []
 
-    data = response.copy()
+    # Create a shallow copy as we are going to modify it
+    response = response.copy()
 
-    if not data['timed_out']:
-        del data['timed_out']
+    if not response['timed_out']:
+        # Delete this field as we don't want to parse it as metric
+        del response['timed_out']
 
-        labels = {'cluster_name': [data['cluster_name']]}
-        del data['cluster_name']
+        labels = {'cluster_name': [response['cluster_name']]}
 
-        result.extend(parse_block(data, metric=metric, labels=labels))
+        result.extend(parse_block(response, metric=metric, labels=labels))
 
     return result
