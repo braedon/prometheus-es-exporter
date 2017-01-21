@@ -13,6 +13,7 @@ from logstash_formatter import LogstashFormatterV1
 from prometheus_client import start_http_server, Gauge
 
 from prometheus_es_exporter import cluster_health_parser
+from prometheus_es_exporter import indices_stats_parser
 from prometheus_es_exporter import nodes_stats_parser
 from prometheus_es_exporter.parser import parse_response
 
@@ -96,6 +97,17 @@ def get_nodes_stats(es_client):
         update_gauges(metrics)
 
 
+def get_indices_stats(es_client, parse_indices):
+    try:
+        response = es_client.indices.stats()
+
+        metrics = indices_stats_parser.parse_response(response, parse_indices, ['indices_stats'])
+    except Exception:
+        logging.exception('Error while fetching indices stats.')
+    else:
+        update_gauges(metrics)
+
+
 def run_scheduler(scheduler, interval, func):
     def scheduled_run(scheduled_time,):
         try:
@@ -155,6 +167,12 @@ def main():
                         help='disable nodes stats monitoring.')
     parser.add_argument('--nodes-stats-interval', type=float, default=10,
                         help='polling interval for nodes stats monitoring in seconds. (default: 10)')
+    parser.add_argument('--indices-stats-disable', action='store_true',
+                        help='disable indices stats monitoring.')
+    parser.add_argument('--indices-stats-interval', type=float, default=10,
+                        help='polling interval for indices stats monitoring in seconds. (default: 10)')
+    parser.add_argument('--indices-stats-mode', default='cluster', choices=['cluster', 'indices'],
+                        help='detail mode for indices stats monitoring.  (default: indices)')
     parser.add_argument('-j', '--json-logging', action='store_true',
                         help='turn on json logging.')
     parser.add_argument('-v', '--verbose', action='store_true',
@@ -207,6 +225,11 @@ def main():
     if not args.nodes_stats_disable:
         nodes_stats_func = partial(get_nodes_stats, es_client)
         run_scheduler(scheduler, args.nodes_stats_interval, nodes_stats_func)
+
+    if not args.indices_stats_disable:
+        parse_indices = args.indices_stats_mode == 'indices'
+        indices_stats_func = partial(get_indices_stats, es_client, parse_indices)
+        run_scheduler(scheduler, args.indices_stats_interval, indices_stats_func)
 
     logging.info('Starting server...')
     start_http_server(port)
