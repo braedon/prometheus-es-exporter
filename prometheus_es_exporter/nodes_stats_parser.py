@@ -57,11 +57,7 @@ def parse_node(node, metric=[], labels={}):
 def parse_response(response, metric=[]):
     result = []
 
-    response = response.copy()
-
-    if not response['_nodes']['failed']:
-        del response['_nodes']
-
+    if '_nodes' not in response or not response['_nodes']['failed']:
         labels = {'cluster_name': [response['cluster_name']]}
 
         for key, value in response['nodes'].items():
