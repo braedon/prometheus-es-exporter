@@ -513,49 +513,48 @@ class Test(unittest.TestCase):
         #     }
         # }
         response = {
-            "_shards" : {
-                "total" : 5,
-                "successful" : 5,
-                "failed" : 0
+            "_shards": {
+                "total": 5,
+                "successful": 5,
+                "failed": 0
             },
-            "aggregations" : {
-                "val_terms" : {
-                    "doc_count_error_upper_bound" : 0,
-                    "sum_other_doc_count" : 0,
-                    "buckets" : [
+            "aggregations": {
+                "val_terms": {
+                    "doc_count_error_upper_bound": 0,
+                    "sum_other_doc_count": 0,
+                    "buckets": [
                         {
-                            "key" : 1,
-                            "doc_count" : 1,
-                            "val_sum" : {
-                                "value" : 1.0
+                            "key": 1,
+                            "doc_count": 1,
+                            "val_sum": {
+                                "value": 1.0
                             }
                         },
                         {
-                            "key" : 2,
-                            "doc_count" : 1,
-                            "val_sum" : {
-                              "value" : 2.0
+                            "key": 2,
+                            "doc_count": 1,
+                            "val_sum": {
+                                "value": 2.0
                             }
                         },
                         {
-                            "key" : 3,
-                            "doc_count" : 1,
-                            "val_sum" : {
-                                "value" : 3.0
+                            "key": 3,
+                            "doc_count": 1,
+                            "val_sum": {
+                                "value": 3.0
                             }
                         }
                     ]
                 }
             },
-            "hits" : {
-                "total" : 3,
-                "max_score" : 0.0,
-                "hits" : []
+            "hits": {
+                "total": 3,
+                "max_score": 0.0,
+                "hits": []
             },
-            "timed_out" : False,
-            "took" : 4
+            "timed_out": False,
+            "took": 4
         }
-
 
         expected = {
             'hits': 3,
@@ -688,6 +687,7 @@ class Test(unittest.TestCase):
         }
         result = convert_result(parse_response(response))
         self.assertEqual(result, expected)
+
 
 if __name__ == '__main__':
     unittest.main()
