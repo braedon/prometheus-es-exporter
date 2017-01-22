@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='prometheus-es-exporter',
-    version='0.3.0.alpha1',
+    version='0.3.0.alpha2',
     description='Elasticsearch query Prometheus exporter',
     url='https://github.com/Braedon/prometheus-es-exporter',
     author='Braedon Vickers',
