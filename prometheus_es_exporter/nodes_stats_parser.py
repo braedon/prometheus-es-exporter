@@ -58,9 +58,7 @@ def parse_response(response, metric=[]):
     result = []
 
     if '_nodes' not in response or not response['_nodes']['failed']:
-        labels = {'cluster_name': [response['cluster_name']]}
-
         for key, value in response['nodes'].items():
-            result.extend(parse_node(value, metric=metric, labels={**labels, 'node_id': [key]}))
+            result.extend(parse_node(value, metric=metric, labels={'node_id': [key]}))
 
     return result

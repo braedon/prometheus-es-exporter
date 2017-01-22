@@ -46,8 +46,6 @@ def parse_response(response, metric=[]):
         # Delete this field as we don't want to parse it as metric
         del response['timed_out']
 
-        labels = {'cluster_name': [response['cluster_name']]}
-
-        result.extend(parse_block(response, metric=metric, labels=labels))
+        result.extend(parse_block(response, metric=metric))
 
     return result
