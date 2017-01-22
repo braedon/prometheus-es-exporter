@@ -79,7 +79,7 @@ def get_cluster_health(es_client, level):
     try:
         response = es_client.cluster.health(level=level)
 
-        metrics = cluster_health_parser.parse_response(response, ['cluster_health'])
+        metrics = cluster_health_parser.parse_response(response, ['es', 'cluster_health'])
     except Exception:
         logging.exception('Error while fetching cluster health.')
     else:
@@ -90,7 +90,7 @@ def get_nodes_stats(es_client):
     try:
         response = es_client.nodes.stats()
 
-        metrics = nodes_stats_parser.parse_response(response, ['nodes_stats'])
+        metrics = nodes_stats_parser.parse_response(response, ['es', 'nodes_stats'])
     except Exception:
         logging.exception('Error while fetching nodes stats.')
     else:
@@ -101,7 +101,7 @@ def get_indices_stats(es_client, parse_indices):
     try:
         response = es_client.indices.stats()
 
-        metrics = indices_stats_parser.parse_response(response, parse_indices, ['indices_stats'])
+        metrics = indices_stats_parser.parse_response(response, parse_indices, ['es', 'indices_stats'])
     except Exception:
         logging.exception('Error while fetching indices stats.')
     else:
@@ -172,7 +172,7 @@ def main():
     parser.add_argument('--indices-stats-interval', type=float, default=10,
                         help='polling interval for indices stats monitoring in seconds. (default: 10)')
     parser.add_argument('--indices-stats-mode', default='cluster', choices=['cluster', 'indices'],
-                        help='detail mode for indices stats monitoring.  (default: indices)')
+                        help='detail mode for indices stats monitoring.  (default: cluster)')
     parser.add_argument('-j', '--json-logging', action='store_true',
                         help='turn on json logging.')
     parser.add_argument('-v', '--verbose', action='store_true',

@@ -14,9 +14,9 @@ def parse_block(block, metric=[], labels={}):
     status = block['status']
     if status == 'green':
         status_int = 0
-    if status == 'yellow':
+    elif status == 'yellow':
         status_int = 1
-    elif status == 'green':
+    elif status == 'red':
         status_int = 2
     result.append((metric + ['status'], labels, status_int))
 
