@@ -172,7 +172,7 @@ def main():
     parser.add_argument('--indices-stats-interval', type=float, default=10,
                         help='polling interval for indices stats monitoring in seconds. (default: 10)')
     parser.add_argument('--indices-stats-mode', default='cluster', choices=['cluster', 'indices'],
-                        help='detail mode for indices stats monitoring.  (default: indices)')
+                        help='detail mode for indices stats monitoring.  (default: cluster)')
     parser.add_argument('-j', '--json-logging', action='store_true',
                         help='turn on json logging.')
     parser.add_argument('-v', '--verbose', action='store_true',
