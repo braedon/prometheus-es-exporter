@@ -13,7 +13,7 @@ from tests.utils import convert_result
 class Test(unittest.TestCase):
     maxDiff = None
 
-    # Endpoint: /_nodes/stats?pretty
+    # Endpoint: /_stats?pretty
     response = {
         '_shards': {
             'total': 10,
