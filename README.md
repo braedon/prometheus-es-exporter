@@ -28,7 +28,7 @@ Note that you may need to add the start script location (see pip output) to your
 # Usage
 Once installed, you can run the exporter with the `prometheus-es-exporter` command.
 
-By default, it will bind to port 8080, query Elasticsearch on `localhost:9200` and run queries configured in a file `exporter.cfg` in the working directory. You can change these defaults as required by passing in options:
+By default, it will bind to port 9206, query Elasticsearch on `localhost:9200` and run queries configured in a file `exporter.cfg` in the working directory. You can change these defaults as required by passing in options:
 ```
 > prometheus-es-exporter -p <port> -e <elasticsearch nodes> -c <path to query config file>
 ```
@@ -41,11 +41,11 @@ Docker images for released versions can be found on Docker Hub (note that no `la
 ```
 > sudo docker pull braedon/prometheus-es-exporter:<version>
 ```
-To run a container successfully, you will need to mount a query config file to `/usr/src/app/exporter.cfg` and map container port 8080 to a port on the host. Any options placed after the image name (`prometheus-es-exporter`) will be passed to the process inside the container. For example, you will need to use this to configure the elasticsearch node(s) using `-e`.
+To run a container successfully, you will need to mount a query config file to `/usr/src/app/exporter.cfg` and map container port 9206 to a port on the host. Any options placed after the image name (`prometheus-es-exporter`) will be passed to the process inside the container. For example, you will need to use this to configure the elasticsearch node(s) using `-e`.
 ```
 > sudo docker run --rm --name exporter \
     -v <path to query config file>:/usr/src/app/exporter.cfg \
-    -p <host port>:8080 \
+    -p <host port>:9206 \
     braedon/prometheus-es-exporter:<version> -e <elasticsearch nodes>
 ```
 If you don't want to mount the query config file in at run time, you could extend an existing image with your own Dockerfile that copies the config file in at build time.

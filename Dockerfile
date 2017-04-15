@@ -11,6 +11,6 @@ RUN pip install -e .
 COPY LICENSE /usr/src/app/
 COPY README.md /usr/src/app/
 
-EXPOSE 8080
+EXPOSE 9206
 
 ENTRYPOINT ["python", "-u", "/usr/local/bin/prometheus-es-exporter"]

@@ -151,8 +151,8 @@ def main():
     parser = argparse.ArgumentParser(description='Export ES query results to Prometheus.')
     parser.add_argument('-e', '--es-cluster', default='localhost',
                         help='addresses of nodes in a Elasticsearch cluster to run queries on. Nodes should be separated by commas e.g. es1,es2. Ports can be provided if non-standard (9200) e.g. es1:9999 (default: localhost)')
-    parser.add_argument('-p', '--port', type=int, default=8080,
-                        help='port to serve the metrics endpoint on. (default: 8080)')
+    parser.add_argument('-p', '--port', type=int, default=9206,
+                        help='port to serve the metrics endpoint on. (default: 9206)')
     parser.add_argument('--query-disable', action='store_true',
                         help='disable query monitoring. Config file does not need to be present if query monitoring is disabled.')
     parser.add_argument('-c', '--config-file', default='exporter.cfg',
