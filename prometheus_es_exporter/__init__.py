@@ -175,7 +175,9 @@ def main():
                         help='detail mode for indices stats monitoring.  (default: cluster)')
     parser.add_argument('-j', '--json-logging', action='store_true',
                         help='turn on json logging.')
-    parser.add_argument('-v', '--verbose', action='store_true',
+    parser.add_argument('-d', '--debug', action='store_const', dest="loglevel", const=logging.DEBUG, default=logging.WARNING,
+                        help='print lots of debug statements.')
+    parser.add_argument('-v', '--verbose', action='store_const', dest="loglevel", const=logging.INFO,
                         help='turn on verbose logging.')
     args = parser.parse_args()
 
@@ -186,7 +188,7 @@ def main():
 
     logging.basicConfig(
         handlers=[log_handler],
-        level=logging.DEBUG if args.verbose else logging.INFO
+        level=args.loglevel
     )
     logging.captureWarnings(True)
 
