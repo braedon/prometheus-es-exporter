@@ -177,6 +177,8 @@ def main():
                         help='turn on json logging.')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='turn on verbose logging.')
+    parser.add_argument('--ca-certs', default='',
+                        help='turn on SSL verification and use these certificates.')
     args = parser.parse_args()
 
     log_handler = logging.StreamHandler()
@@ -192,7 +194,10 @@ def main():
 
     port = args.port
     es_cluster = args.es_cluster.split(',')
-    es_client = Elasticsearch(es_cluster, verify_certs=False)
+    if args.ca_certs:
+        es_client = Elasticsearch(es_cluster, verify_certs=True, ca_certs=args.ca_certs)
+    else:
+        es_client = Elasticsearch(es_cluster, verify_certs=False)
 
     scheduler = sched.scheduler()
 
