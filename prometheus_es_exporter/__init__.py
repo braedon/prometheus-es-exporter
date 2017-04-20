@@ -86,9 +86,9 @@ def get_cluster_health(es_client, level):
         update_gauges(metrics)
 
 
-def get_nodes_stats(es_client):
+def get_nodes_stats(es_client, metrics=None):
     try:
-        response = es_client.nodes.stats()
+        response = es_client.nodes.stats(metric=metrics)
 
         metrics = nodes_stats_parser.parse_response(response, ['es', 'nodes_stats'])
     except Exception:
@@ -97,9 +97,9 @@ def get_nodes_stats(es_client):
         update_gauges(metrics)
 
 
-def get_indices_stats(es_client, parse_indices):
+def get_indices_stats(es_client, parse_indices, metrics=None):
     try:
-        response = es_client.indices.stats()
+        response = es_client.indices.stats(metric=metrics)
 
         metrics = indices_stats_parser.parse_response(response, parse_indices, ['es', 'indices_stats'])
     except Exception:
@@ -145,6 +145,44 @@ def signal_handler(signum, frame):
     shutdown()
 
 
+def csv_choice_arg_parser(choices, arg):
+    metrics = arg.split(',')
+
+    invalid_metrics = []
+    for metric in metrics:
+        if metric not in choices:
+            invalid_metrics.append(metric)
+
+    if invalid_metrics:
+        msg = 'invalid metric(s): "{}" in "{}" (choose from {})' \
+            .format(','.join(invalid_metrics), arg, ','.join(choices))
+        raise argparse.ArgumentTypeError(msg)
+
+    return metrics
+
+
+# https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-nodes-stats.html#_nodes_statistics
+NODES_STATS_METRICS_OPTIONS = [
+    'indices', 'fs', 'http', 'jvm', 'os',
+    'process', 'thread_pool', 'transport',
+    'breaker', 'discovery', 'ingest'
+]
+nodes_stats_metrics_parser = partial(csv_choice_arg_parser, NODES_STATS_METRICS_OPTIONS)
+
+
+'completion,docs,fielddata,flush,get,indexing,merge,query_cache,recovery,refresh,request_cache,search,segments,store,suggest,translog,warmer'
+
+# https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-nodes-stats.html#node-indices-stats
+INDICES_STATS_METRICS_OPTIONS = [
+    'completion', 'docs', 'fielddata',
+    'flush', 'get', 'indexing', 'merge',
+    'query_cache', 'recovery', 'refresh',
+    'request_cache', 'search', 'segments',
+    'store', 'suggest', 'translog', 'warmer'
+]
+indices_stats_metrics_parser = partial(csv_choice_arg_parser, INDICES_STATS_METRICS_OPTIONS)
+
+
 def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
@@ -169,12 +207,16 @@ def main():
                         help='disable nodes stats monitoring.')
     parser.add_argument('--nodes-stats-interval', type=float, default=10,
                         help='polling interval for nodes stats monitoring in seconds. (default: 10)')
+    parser.add_argument('--nodes-stats-metrics', type=nodes_stats_metrics_parser,
+                        help='limit nodes stats to specific metrics. Metrics should be separated by commas e.g. indices,fs.')
     parser.add_argument('--indices-stats-disable', action='store_true',
                         help='disable indices stats monitoring.')
     parser.add_argument('--indices-stats-interval', type=float, default=10,
                         help='polling interval for indices stats monitoring in seconds. (default: 10)')
     parser.add_argument('--indices-stats-mode', default='cluster', choices=['cluster', 'indices'],
                         help='detail mode for indices stats monitoring. (default: cluster)')
+    parser.add_argument('--indices-stats-metrics', type=indices_stats_metrics_parser,
+                        help='limit indices stats to specific metrics. Metrics should be separated by commas e.g. indices,fs.')
     parser.add_argument('-j', '--json-logging', action='store_true',
                         help='turn on json logging.')
     parser.add_argument('--log-level', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -232,12 +274,12 @@ def main():
         run_scheduler(scheduler, args.cluster_health_interval, cluster_health_func)
 
     if not args.nodes_stats_disable:
-        nodes_stats_func = partial(get_nodes_stats, es_client)
+        nodes_stats_func = partial(get_nodes_stats, es_client, metrics=args.nodes_stats_metrics)
         run_scheduler(scheduler, args.nodes_stats_interval, nodes_stats_func)
 
     if not args.indices_stats_disable:
         parse_indices = args.indices_stats_mode == 'indices'
-        indices_stats_func = partial(get_indices_stats, es_client, parse_indices)
+        indices_stats_func = partial(get_indices_stats, es_client, parse_indices, metrics=args.indices_stats_metrics)
         run_scheduler(scheduler, args.indices_stats_interval, indices_stats_func)
 
     logging.info('Starting server...')
