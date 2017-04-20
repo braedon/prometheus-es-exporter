@@ -151,6 +151,8 @@ def main():
     parser = argparse.ArgumentParser(description='Export ES query results to Prometheus.')
     parser.add_argument('-e', '--es-cluster', default='localhost',
                         help='addresses of nodes in a Elasticsearch cluster to run queries on. Nodes should be separated by commas e.g. es1,es2. Ports can be provided if non-standard (9200) e.g. es1:9999 (default: localhost)')
+    parser.add_argument('--ca-certs', default=None,
+                        help='path to a CA certificate bundle. Can be absolute, or relative to the current working directory. If not specified, SSL certificate verification is disabled.')
     parser.add_argument('-p', '--port', type=int, default=9206,
                         help='port to serve the metrics endpoint on. (default: 9206)')
     parser.add_argument('--query-disable', action='store_true',
@@ -177,8 +179,6 @@ def main():
                         help='turn on json logging.')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='turn on verbose logging.')
-    parser.add_argument('--ca-certs', default='',
-                        help='turn on SSL verification and use these certificates.')
     args = parser.parse_args()
 
     log_handler = logging.StreamHandler()
