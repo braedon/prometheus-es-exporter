@@ -64,9 +64,9 @@ def update_gauges(metrics):
         gauges[metric_name] = (new_label_values_set, gauge)
 
 
-def run_query(es_client, name, indices, query):
+def run_query(es_client, name, indices, query, timeout):
     try:
-        response = es_client.search(index=indices, body=query)
+        response = es_client.search(index=indices, body=query, request_timeout=timeout)
 
         metrics = parse_response(response, [name])
     except Exception:
@@ -206,14 +206,15 @@ def main():
             if section.startswith(query_prefix):
                 query_name = section[len(query_prefix):]
                 query_interval = config.getfloat(section, 'QueryIntervalSecs')
+                query_timeout = config.getint(section, 'QueryTimeoutSecs', fallback=10)
                 query_indices = config.get(section, 'QueryIndices', fallback='_all')
                 query = json.loads(config.get(section, 'QueryJson'))
 
-                queries[query_name] = (query_interval, query_indices, query)
+                queries[query_name] = (query_interval, query_timeout, query_indices, query)
 
         if queries:
-            for name, (interval, indices, query) in queries.items():
-                func = partial(run_query, es_client, name, indices, query)
+            for name, (interval, timeout, indices, query) in queries.items():
+                func = partial(run_query, es_client, name, indices, query, timeout)
                 run_scheduler(scheduler, interval, func)
         else:
             logging.warn('No queries found in config file %s', args.config_file)
