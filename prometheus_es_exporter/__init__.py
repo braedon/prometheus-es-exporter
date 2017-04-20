@@ -205,7 +205,7 @@ def main():
         for section in config.sections():
             if section.startswith(query_prefix):
                 query_name = section[len(query_prefix):]
-                query_interval = config.getfloat(section, 'QueryIntervalSecs')
+                query_interval = config.getfloat(section, 'QueryIntervalSecs', fallback=15)
                 query_timeout = config.getint(section, 'QueryTimeoutSecs', fallback=10)
                 query_indices = config.get(section, 'QueryIndices', fallback='_all')
                 query = json.loads(config.get(section, 'QueryJson'))
