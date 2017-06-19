@@ -280,9 +280,11 @@ def main():
     else:
         es_client = Elasticsearch(es_cluster, verify_certs=False)
 
-    scheduler = sched.scheduler()
+    scheduler = None
 
     if not args.query_disable:
+        scheduler = sched.scheduler()
+
         config = configparser.ConfigParser()
         config.read_file(open(args.config_file))
 
@@ -320,7 +322,11 @@ def main():
     logging.info('Server started on port %s', port)
 
     try:
-        scheduler.run()
+        if scheduler:
+            scheduler.run()
+        else:
+            while True:
+                time.sleep(5)
     except KeyboardInterrupt:
         pass
 
