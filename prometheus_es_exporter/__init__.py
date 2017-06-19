@@ -9,7 +9,7 @@ import time
 
 from elasticsearch import Elasticsearch
 from functools import partial
-from logstash_formatter import LogstashFormatterV1
+from jog import JogFormatter
 from prometheus_client import start_http_server, Gauge
 from prometheus_client.core import GaugeMetricFamily, REGISTRY
 
@@ -263,7 +263,7 @@ def main():
 
     log_handler = logging.StreamHandler()
     log_format = '[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s'
-    formatter = LogstashFormatterV1() if args.json_logging else logging.Formatter(log_format)
+    formatter = JogFormatter(log_format) if args.json_logging else logging.Formatter(log_format)
     log_handler.setFormatter(formatter)
 
     log_level = getattr(logging, args.log_level)
