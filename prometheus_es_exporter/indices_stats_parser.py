@@ -1,6 +1,10 @@
-singular_forms = {}
+singular_forms = {
+    'fields': 'field'
+}
 excluded_keys = []
-bucket_dict_keys = []
+bucket_dict_keys = [
+    'fields'
+]
 bucket_list_keys = {}
 
 

@@ -102,7 +102,15 @@ class Test(unittest.TestCase):
                 },
                 'fielddata': {
                     'memory_size_in_bytes': 0,
-                    'evictions': 0
+                    'evictions': 0,
+                    'fields': {
+                        'group1': {
+                            'memory_size_in_bytes': 1024
+                        },
+                        'group2': {
+                            'memory_size_in_bytes': 2048
+                        }
+                    }
                 },
                 'completion': {
                     'size_in_bytes': 0
@@ -219,7 +227,15 @@ class Test(unittest.TestCase):
                 },
                 'fielddata': {
                     'memory_size_in_bytes': 0,
-                    'evictions': 0
+                    'evictions': 0,
+                    'fields': {
+                        'group1': {
+                            'memory_size_in_bytes': 1024
+                        },
+                        'group2': {
+                            'memory_size_in_bytes': 2048
+                        }
+                    }
                 },
                 'completion': {
                     'size_in_bytes': 0
@@ -339,7 +355,15 @@ class Test(unittest.TestCase):
                     },
                     'fielddata': {
                         'memory_size_in_bytes': 0,
-                        'evictions': 0
+                        'evictions': 0,
+                        'fields': {
+                            'group1': {
+                                'memory_size_in_bytes': 1024
+                            },
+                            'group2': {
+                                'memory_size_in_bytes': 2048
+                            }
+                        }
                     },
                     'completion': {
                         'size_in_bytes': 0
@@ -456,7 +480,15 @@ class Test(unittest.TestCase):
                     },
                     'fielddata': {
                         'memory_size_in_bytes': 0,
-                        'evictions': 0
+                        'evictions': 0,
+                        'fields': {
+                            'group1': {
+                                'memory_size_in_bytes': 1024
+                            },
+                            'group2': {
+                                'memory_size_in_bytes': 2048
+                            }
+                        }
                     },
                     'completion': {
                         'size_in_bytes': 0
@@ -559,6 +591,8 @@ class Test(unittest.TestCase):
             'primaries_query_cache_evictions{index="_all"}': 0,
             'primaries_fielddata_memory_size_in_bytes{index="_all"}': 0,
             'primaries_fielddata_evictions{index="_all"}': 0,
+            'primaries_fielddata_fields_memory_size_in_bytes{field="group1",index="_all"}': 1024,
+            'primaries_fielddata_fields_memory_size_in_bytes{field="group2",index="_all"}': 2048,
             'primaries_completion_size_in_bytes{index="_all"}': 0,
             'primaries_segments_count{index="_all"}': 3,
             'primaries_segments_memory_in_bytes{index="_all"}': 7908,
@@ -641,6 +675,8 @@ class Test(unittest.TestCase):
             'total_query_cache_evictions{index="_all"}': 0,
             'total_fielddata_memory_size_in_bytes{index="_all"}': 0,
             'total_fielddata_evictions{index="_all"}': 0,
+            'total_fielddata_fields_memory_size_in_bytes{field="group1",index="_all"}': 1024,
+            'total_fielddata_fields_memory_size_in_bytes{field="group2",index="_all"}': 2048,
             'total_completion_size_in_bytes{index="_all"}': 0,
             'total_segments_count{index="_all"}': 3,
             'total_segments_memory_in_bytes{index="_all"}': 7908,
@@ -730,6 +766,8 @@ class Test(unittest.TestCase):
             'primaries_query_cache_evictions{index="foo"}': 0,
             'primaries_fielddata_memory_size_in_bytes{index="foo"}': 0,
             'primaries_fielddata_evictions{index="foo"}': 0,
+            'primaries_fielddata_fields_memory_size_in_bytes{field="group1",index="foo"}': 1024,
+            'primaries_fielddata_fields_memory_size_in_bytes{field="group2",index="foo"}': 2048,
             'primaries_completion_size_in_bytes{index="foo"}': 0,
             'primaries_segments_count{index="foo"}': 3,
             'primaries_segments_memory_in_bytes{index="foo"}': 7908,
@@ -812,6 +850,8 @@ class Test(unittest.TestCase):
             'total_query_cache_evictions{index="foo"}': 0,
             'total_fielddata_memory_size_in_bytes{index="foo"}': 0,
             'total_fielddata_evictions{index="foo"}': 0,
+            'total_fielddata_fields_memory_size_in_bytes{field="group1",index="foo"}': 1024,
+            'total_fielddata_fields_memory_size_in_bytes{field="group2",index="foo"}': 2048,
             'total_completion_size_in_bytes{index="foo"}': 0,
             'total_segments_count{index="foo"}': 3,
             'total_segments_memory_in_bytes{index="foo"}': 7908,

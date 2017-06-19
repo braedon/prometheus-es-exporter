@@ -134,14 +134,15 @@ class NodesStatsCollector(object):
 
 
 class IndicesStatsCollector(object):
-    def __init__(self, es_client, parse_indices, metrics=None):
+    def __init__(self, es_client, parse_indices, metrics=None, fields=None):
         self.es_client = es_client
         self.parse_indices = parse_indices
         self.metrics = metrics
+        self.fields = fields
 
     def collect(self):
         try:
-            response = self.es_client.indices.stats(metric=self.metrics)
+            response = self.es_client.indices.stats(metric=self.metrics, fields=self.fields)
 
             metrics = indices_stats_parser.parse_response(response, self.parse_indices, ['es', 'indices_stats'])
         except Exception:
@@ -225,6 +226,13 @@ INDICES_STATS_METRICS_OPTIONS = [
 indices_stats_metrics_parser = partial(csv_choice_arg_parser, INDICES_STATS_METRICS_OPTIONS)
 
 
+def indices_stats_fields_parser(arg):
+    if arg == '*':
+        return arg
+    else:
+        return arg.split(',')
+
+
 def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
@@ -253,6 +261,8 @@ def main():
                         help='detail mode for indices stats monitoring. (default: cluster)')
     parser.add_argument('--indices-stats-metrics', type=indices_stats_metrics_parser,
                         help='limit indices stats to specific metrics. Metrics should be separated by commas e.g. indices,fs.')
+    parser.add_argument('--indices-stats-fields', type=indices_stats_fields_parser,
+                        help='include fielddata info for specific fields. Fields should be separated by commas e.g. indices,fs. Use \'*\' for all.')
     parser.add_argument('-j', '--json-logging', action='store_true',
                         help='turn on json logging.')
     parser.add_argument('--log-level', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -315,7 +325,9 @@ def main():
 
     if not args.indices_stats_disable:
         parse_indices = args.indices_stats_mode == 'indices'
-        REGISTRY.register(IndicesStatsCollector(es_client, parse_indices, metrics=args.indices_stats_metrics))
+        REGISTRY.register(IndicesStatsCollector(es_client, parse_indices,
+                                                metrics=args.indices_stats_metrics,
+                                                fields=args.indices_stats_fields))
 
     logging.info('Starting server...')
     start_http_server(port)
