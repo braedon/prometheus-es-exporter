@@ -60,6 +60,7 @@ def parse_response(response, metric=[]):
 
     if not response['timed_out']:
         result.append((metric + ['hits'], {}, response['hits']['total']))
+        result.append((metric + ['took', 'milliseconds'], {}, response['took']))
 
         if 'aggregations' in response.keys():
             for key, value in response['aggregations'].items():

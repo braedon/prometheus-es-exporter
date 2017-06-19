@@ -7,7 +7,7 @@ The exporter periodically runs configured queries against the Elasticsearch clus
 
 Values are parsed out of the Elasticsearch results automatically, with the path through the JSON to the value being used to construct metric names.
 
-Metrics are only extracted from aggregation results, with the exception of the query doc count. The keys of any buckets are converted to labels, rather than being inserted into the metric name. See [tests/test_parser.py](tests/test_parser.py) for all the supported queries/metrics.
+Metrics are only extracted from aggregation results, with the exception of the query `hits.total` count (exposed as `hits`) and `took` time (exposed as `took_milliseconds`). The keys of any buckets are converted to labels, rather than being inserted into the metric name. See [tests/test_parser.py](tests/test_parser.py) for all the supported queries/metrics.
 
 ## Cluster Metrics
 The exporter periodically queries the Elasticsearch cluster's `_cluster/health`, `_nodes/stats`, and `_stats` endpoints, and exports the results as Prometheus gauge metrics.

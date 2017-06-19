@@ -36,7 +36,8 @@ class Test(unittest.TestCase):
         }
 
         expected = {
-            'hits': 3
+            'hits': 3,
+            'took_milliseconds': 1
         }
         result = convert_result(parse_response(response))
         self.assertEqual(result, expected)
@@ -77,6 +78,7 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
+            'took_milliseconds': 1,
             'val_avg_value': 2
         }
         result = convert_result(parse_response(response))
@@ -126,6 +128,7 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
+            'took_milliseconds': 1,
             'val_percentiles_values_1_0': 1.02,
             'val_percentiles_values_5_0': 1.1,
             'val_percentiles_values_25_0': 1.5,
@@ -176,6 +179,7 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
+            'took_milliseconds': 1,
             'val_stats_avg': 2.0,
             'val_stats_count': 3,
             'val_stats_max': 3.0,
@@ -231,6 +235,7 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
+            'took_milliseconds': 1,
             'val_extended_stats_avg': 2.0,
             'val_extended_stats_count': 3,
             'val_extended_stats_max': 3.0,
@@ -289,6 +294,7 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
+            'took_milliseconds': 1,
             'group1_filter_doc_count': 2,
             'group1_filter_val_sum_value': 3.0
         }
@@ -353,6 +359,7 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
+            'took_milliseconds': 1,
             'group_filter_doc_count{group_filter="group_a"}': 2,
             'group_filter_doc_count{group_filter="group_b"}': 1,
             'group_filter_val_sum_value{group_filter="group_a"}': 3.0,
@@ -419,6 +426,7 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
+            'took_milliseconds': 1,
             'group_filter_doc_count{group_filter="filter_0"}': 2,
             'group_filter_doc_count{group_filter="filter_1"}': 1,
             'group_filter_val_sum_value{group_filter="filter_0"}': 3.0,
@@ -484,6 +492,7 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
+            'took_milliseconds': 2,
             'group1_term_doc_count_error_upper_bound': 0,
             'group1_term_sum_other_doc_count': 0,
             'group1_term_doc_count{group1_term="a"}': 2,
@@ -558,6 +567,7 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
+            'took_milliseconds': 4,
             'val_terms_doc_count_error_upper_bound': 0,
             'val_terms_sum_other_doc_count': 0,
             'val_terms_doc_count{val_terms="1"}': 1,
@@ -668,6 +678,7 @@ class Test(unittest.TestCase):
 
         expected = {
             'hits': 3,
+            'took_milliseconds': 2,
             'group1_term_doc_count_error_upper_bound': 0,
             'group1_term_sum_other_doc_count': 0,
             'group1_term_doc_count{group1_term="a"}': 2,
