@@ -11,6 +11,7 @@ from elasticsearch import Elasticsearch
 from functools import partial
 from logstash_formatter import LogstashFormatterV1
 from prometheus_client import start_http_server, Gauge
+from prometheus_client.core import GaugeMetricFamily, REGISTRY
 
 from prometheus_es_exporter import cluster_health_parser
 from prometheus_es_exporter import indices_stats_parser
@@ -28,7 +29,7 @@ def format_metric_name(name_list):
     return '_'.join(name_list).replace('.', '_')
 
 
-def update_gauges(metrics):
+def group_metrics(metrics):
     metric_dict = {}
     for (name_list, label_dict, value) in metrics:
         metric_name = format_metric_name(name_list)
@@ -42,6 +43,12 @@ def update_gauges(metrics):
         ])
 
         metric_dict[metric_name][1][label_values] = value
+
+    return metric_dict
+
+
+def update_gauges(metrics):
+    metric_dict = group_metrics(metrics)
 
     for metric_name, (label_keys, value_dict) in metric_dict.items():
         if metric_name in gauges:
@@ -64,6 +71,25 @@ def update_gauges(metrics):
         gauges[metric_name] = (new_label_values_set, gauge)
 
 
+def gauge_generator(metrics):
+    metric_dict = group_metrics(metrics)
+
+    for metric_name, (label_keys, value_dict) in metric_dict.items():
+        # If we have label keys we may have multiple different values,
+        # each with their own label values.
+        if label_keys:
+            gauge = GaugeMetricFamily(metric_name, '', labels=label_keys)
+
+            for label_values, value in value_dict.items():
+                gauge.add_metric(label_values, value)
+
+        # No label keys, so we must have only a single value.
+        else:
+            gauge = GaugeMetricFamily(metric_name, '', value=list(value_dict.values())[0])
+
+        yield gauge
+
+
 def run_query(es_client, name, indices, query, timeout):
     try:
         response = es_client.search(index=indices, body=query, request_timeout=timeout)
@@ -75,37 +101,53 @@ def run_query(es_client, name, indices, query, timeout):
         update_gauges(metrics)
 
 
-def get_cluster_health(es_client, level):
-    try:
-        response = es_client.cluster.health(level=level)
+class ClusterHealthCollector(object):
+    def __init__(self, es_client, level):
+        self.es_client = es_client
+        self.level = level
 
-        metrics = cluster_health_parser.parse_response(response, ['es', 'cluster_health'])
-    except Exception:
-        logging.exception('Error while fetching cluster health.')
-    else:
-        update_gauges(metrics)
+    def collect(self):
+        try:
+            response = self.es_client.cluster.health(level=self.level)
 
-
-def get_nodes_stats(es_client, metrics=None):
-    try:
-        response = es_client.nodes.stats(metric=metrics)
-
-        metrics = nodes_stats_parser.parse_response(response, ['es', 'nodes_stats'])
-    except Exception:
-        logging.exception('Error while fetching nodes stats.')
-    else:
-        update_gauges(metrics)
+            metrics = cluster_health_parser.parse_response(response, ['es', 'cluster_health'])
+        except Exception:
+            logging.exception('Error while fetching cluster health.')
+        else:
+            yield from gauge_generator(metrics)
 
 
-def get_indices_stats(es_client, parse_indices, metrics=None):
-    try:
-        response = es_client.indices.stats(metric=metrics)
+class NodesStatsCollector(object):
+    def __init__(self, es_client, metrics=None):
+        self.es_client = es_client
+        self.metrics = metrics
 
-        metrics = indices_stats_parser.parse_response(response, parse_indices, ['es', 'indices_stats'])
-    except Exception:
-        logging.exception('Error while fetching indices stats.')
-    else:
-        update_gauges(metrics)
+    def collect(self):
+        try:
+            response = self.es_client.nodes.stats(metric=self.metrics)
+
+            metrics = nodes_stats_parser.parse_response(response, ['es', 'nodes_stats'])
+        except Exception:
+            logging.exception('Error while fetching nodes stats.')
+        else:
+            yield from gauge_generator(metrics)
+
+
+class IndicesStatsCollector(object):
+    def __init__(self, es_client, parse_indices, metrics=None):
+        self.es_client = es_client
+        self.parse_indices = parse_indices
+        self.metrics = metrics
+
+    def collect(self):
+        try:
+            response = self.es_client.indices.stats(metric=self.metrics)
+
+            metrics = indices_stats_parser.parse_response(response, self.parse_indices, ['es', 'indices_stats'])
+        except Exception:
+            logging.exception('Error while fetching indices stats.')
+        else:
+            yield from gauge_generator(metrics)
 
 
 def run_scheduler(scheduler, interval, func):
@@ -199,20 +241,14 @@ def main():
                         help='path to query config file. Can be absolute, or relative to the current working directory. (default: exporter.cfg)')
     parser.add_argument('--cluster-health-disable', action='store_true',
                         help='disable cluster health monitoring.')
-    parser.add_argument('--cluster-health-interval', type=float, default=10,
-                        help='polling interval for cluster health monitoring in seconds. (default: 10)')
     parser.add_argument('--cluster-health-level', default='indices', choices=['cluster', 'indices', 'shards'],
                         help='level of detail for cluster health monitoring.  (default: indices)')
     parser.add_argument('--nodes-stats-disable', action='store_true',
                         help='disable nodes stats monitoring.')
-    parser.add_argument('--nodes-stats-interval', type=float, default=10,
-                        help='polling interval for nodes stats monitoring in seconds. (default: 10)')
     parser.add_argument('--nodes-stats-metrics', type=nodes_stats_metrics_parser,
                         help='limit nodes stats to specific metrics. Metrics should be separated by commas e.g. indices,fs.')
     parser.add_argument('--indices-stats-disable', action='store_true',
                         help='disable indices stats monitoring.')
-    parser.add_argument('--indices-stats-interval', type=float, default=10,
-                        help='polling interval for indices stats monitoring in seconds. (default: 10)')
     parser.add_argument('--indices-stats-mode', default='cluster', choices=['cluster', 'indices'],
                         help='detail mode for indices stats monitoring. (default: cluster)')
     parser.add_argument('--indices-stats-metrics', type=indices_stats_metrics_parser,
@@ -270,17 +306,14 @@ def main():
             logging.warn('No queries found in config file %s', args.config_file)
 
     if not args.cluster_health_disable:
-        cluster_health_func = partial(get_cluster_health, es_client, args.cluster_health_level)
-        run_scheduler(scheduler, args.cluster_health_interval, cluster_health_func)
+        REGISTRY.register(ClusterHealthCollector(es_client, args.cluster_health_level))
 
     if not args.nodes_stats_disable:
-        nodes_stats_func = partial(get_nodes_stats, es_client, metrics=args.nodes_stats_metrics)
-        run_scheduler(scheduler, args.nodes_stats_interval, nodes_stats_func)
+        REGISTRY.register(NodesStatsCollector(es_client, metrics=args.nodes_stats_metrics))
 
     if not args.indices_stats_disable:
         parse_indices = args.indices_stats_mode == 'indices'
-        indices_stats_func = partial(get_indices_stats, es_client, parse_indices, metrics=args.indices_stats_metrics)
-        run_scheduler(scheduler, args.indices_stats_interval, indices_stats_func)
+        REGISTRY.register(IndicesStatsCollector(es_client, parse_indices, metrics=args.indices_stats_metrics))
 
     logging.info('Starting server...')
     start_http_server(port)

@@ -10,7 +10,7 @@ Values are parsed out of the Elasticsearch results automatically, with the path 
 Metrics are only extracted from aggregation results, with the exception of the query `hits.total` count (exposed as `hits`) and `took` time (exposed as `took_milliseconds`). The keys of any buckets are converted to labels, rather than being inserted into the metric name. See [tests/test_parser.py](tests/test_parser.py) for all the supported queries/metrics.
 
 ## Cluster Metrics
-The exporter periodically queries the Elasticsearch cluster's `_cluster/health`, `_nodes/stats`, and `_stats` endpoints, and exports the results as Prometheus gauge metrics.
+The exporter queries the Elasticsearch cluster's `_cluster/health`, `_nodes/stats`, and `_stats` endpoints whenever its metrics endpoint is called, and exports the results as Prometheus gauge metrics.
 
 Endpoint responses are parsed into metrics as generically as possible so that (hopefully) all versions of Elasticsearch (past and future) can be reasonably supported with the same code. This results in less than ideal metrics in some cases - e.g. redundancy between some metrics, no distinction between gauges and counters (everything's a gauge). If you spot something you think can be reasonably improved let me know via a Github issue (or better yet - a PR).
 
