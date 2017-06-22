@@ -1,3 +1,5 @@
+from .utils import merge_dicts
+
 singular_forms = {
     'indices': 'index',
     'shards': 'shard'
@@ -31,7 +33,7 @@ def parse_block(block, metric=[], labels={}):
             else:
                 singular_key = key
             for n_key, n_value in value.items():
-                result.extend(parse_block(n_value, metric=metric + [key], labels={**labels, singular_key: [n_key]}))
+                result.extend(parse_block(n_value, metric=metric + [key], labels=merge_dicts(labels, {singular_key: [n_key]})))
 
     return result
 

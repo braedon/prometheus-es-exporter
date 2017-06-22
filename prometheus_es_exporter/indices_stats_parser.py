@@ -1,3 +1,5 @@
+from .utils import merge_dicts
+
 singular_forms = {
     'fields': 'field'
 }
@@ -24,7 +26,7 @@ def parse_block(block, metric=[], labels={}):
                     else:
                         singular_key = key
                     for n_key, n_value in value.items():
-                        result.extend(parse_block(n_value, metric=metric + [key], labels={**labels, singular_key: [n_key]}))
+                        result.extend(parse_block(n_value, metric=metric + [key], labels=merge_dicts(labels, {singular_key: [n_key]})))
                 else:
                     result.extend(parse_block(value, metric=metric + [key], labels=labels))
             elif isinstance(value, list) and key in bucket_list_keys:
@@ -32,7 +34,7 @@ def parse_block(block, metric=[], labels={}):
 
                 for n_value in value:
                     bucket_name = n_value[bucket_name_key]
-                    result.extend(parse_block(n_value, metric=metric + [key], labels={**labels, bucket_name_key: [bucket_name]}))
+                    result.extend(parse_block(n_value, metric=metric + [key], labels=merge_dicts(labels, {bucket_name_key: [bucket_name]})))
 
     return result
 
