@@ -7,7 +7,6 @@ singular_forms = {
 }
 excluded_keys = [
     'timestamp',
-    'indices',
 ]
 bucket_dict_keys = [
     'pools',
