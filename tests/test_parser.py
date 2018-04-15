@@ -699,6 +699,80 @@ class Test(unittest.TestCase):
         result = convert_result(parse_response(response))
         self.assertEqual(result, expected)
 
+    # Tests handling of disallowed characters in labels and metric names
+    # The '-'s in the aggregation name aren't allowed in metric names or
+    # label keys, so need to be substituted.
+    # The number at the start of the aggregation name isn't allowed at
+    # the start of metric names or label keys.
+    # A double '_' at the start of the label key (post substitutions)
+    # is also not allowed.
+    def test_bad_chars(self):
+        # Query:
+        # {
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
+        #     },
+        #     "aggs": {
+        #         "1-group-filter-1": {
+        #             "filters": {
+        #                 "filters": {
+        #                     "group_a": {"term": {"group1": "a"}},
+        #                     "group_b": {"term": {"group1": "b"}}
+        #                 }
+        #             },
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
+        #                 }
+        #             }
+        #         }
+        #     }
+        # }
+        response = {
+            "_shards": {
+                "failed": 0,
+                "successful": 5,
+                "total": 5
+            },
+            "aggregations": {
+                "1-group-filter-1": {
+                    "buckets": {
+                        "group_a": {
+                            "doc_count": 2,
+                            "val_sum": {
+                                "value": 3.0
+                            }
+                        },
+                        "group_b": {
+                            "doc_count": 1,
+                            "val_sum": {
+                                "value": 3.0
+                            }
+                        }
+                    }
+                }
+            },
+            "hits": {
+                "hits": [],
+                "max_score": 0.0,
+                "total": 3
+            },
+            "timed_out": False,
+            "took": 1
+        }
+
+        expected = {
+            'hits': 3,
+            'took_milliseconds': 1,
+            '__group_filter_1_doc_count{_group_filter_1="group_a"}': 2,
+            '__group_filter_1_doc_count{_group_filter_1="group_b"}': 1,
+            '__group_filter_1_val_sum_value{_group_filter_1="group_a"}': 3.0,
+            '__group_filter_1_val_sum_value{_group_filter_1="group_b"}': 3.0
+        }
+        result = convert_result(parse_response(response))
+        self.assertEqual(result, expected)
+
 
 if __name__ == '__main__':
     unittest.main()

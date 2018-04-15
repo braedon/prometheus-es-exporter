@@ -1,8 +1,10 @@
-from prometheus_es_exporter import format_metric_name, format_label_value
+from prometheus_es_exporter import (format_metric_name,
+                                    format_label_key,
+                                    format_label_value)
 
 
 def format_label(key, value_list):
-    return key + '="' + format_label_value(value_list) + '"'
+    return format_label_key(key) + '="' + format_label_value(value_list) + '"'
 
 
 def format_metric(name_list, label_dict):
