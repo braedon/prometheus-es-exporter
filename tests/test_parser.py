@@ -15,9 +15,9 @@ class Test(unittest.TestCase):
     def test_query(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     }
         # }
         response = {
@@ -46,13 +46,13 @@ class Test(unittest.TestCase):
     def test_avg(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'val_avg': {
-        #             'avg': {'field': 'val'}
+        #     "aggs": {
+        #         "val_avg": {
+        #             "avg": {"field": "val"}
         #         }
         #     }
         # }
@@ -88,13 +88,13 @@ class Test(unittest.TestCase):
     def test_percentiles(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'val_percentiles': {
-        #             'percentiles': {'field': 'val'}
+        #     "aggs": {
+        #         "val_percentiles": {
+        #             "percentiles": {"field": "val"}
         #         }
         #     }
         # }
@@ -143,13 +143,13 @@ class Test(unittest.TestCase):
     def test_stats(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'val_stats': {
-        #             'stats': {'field': 'val'}
+        #     "aggs": {
+        #         "val_stats": {
+        #             "stats": {"field": "val"}
         #         }
         #     }
         # }
@@ -192,13 +192,13 @@ class Test(unittest.TestCase):
     def test_extended_stats(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'val_extended_stats': {
-        #             'extended_stats': {'field': 'val'}
+        #     "aggs": {
+        #         "val_extended_stats": {
+        #             "extended_stats": {"field": "val"}
         #         }
         #     }
         # }
@@ -254,16 +254,16 @@ class Test(unittest.TestCase):
     def test_filter(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'group1_filter': {
-        #             'filter': {'term': {'group1': 'a'}},
-        #             'aggs': {
-        #                 'val_sum': {
-        #                     'sum': {'field': 'val'}
+        #     "aggs": {
+        #         "group1_filter": {
+        #             "filter": {"term": {"group1": "a"}},
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
         #                 }
         #             }
         #         }
@@ -304,21 +304,21 @@ class Test(unittest.TestCase):
     def test_filters(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'group_filter': {
-        #             'filters': {
-        #                 'filters': {
-        #                     'group_a': {'term': {'group1': 'a'}},
-        #                     'group_b': {'term': {'group1': 'b'}}
+        #     "aggs": {
+        #         "group_filter": {
+        #             "filters": {
+        #                 "filters": {
+        #                     "group_a": {"term": {"group1": "a"}},
+        #                     "group_b": {"term": {"group1": "b"}}
         #                 }
         #             },
-        #             'aggs': {
-        #                 'val_sum': {
-        #                     'sum': {'field': 'val'}
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
         #                 }
         #             }
         #         }
@@ -371,21 +371,21 @@ class Test(unittest.TestCase):
     def test_filters_anonymous(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'group_filter': {
-        #             'filters': {
-        #                 'filters': [
-        #                     {'term': {'group1': 'a'}},
-        #                     {'term': {'group1': 'b'}}
+        #     "aggs": {
+        #         "group_filter": {
+        #             "filters": {
+        #                 "filters": [
+        #                     {"term": {"group1": "a"}},
+        #                     {"term": {"group1": "b"}}
         #                 ]
         #             },
-        #             'aggs': {
-        #                 'val_sum': {
-        #                     'sum': {'field': 'val'}
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
         #                 }
         #             }
         #         }
@@ -438,16 +438,16 @@ class Test(unittest.TestCase):
     def test_terms(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'group1_term': {
-        #             'terms': {'field': 'group1'},
-        #             'aggs': {
-        #                 'val_sum': {
-        #                     'sum': {'field': 'val'}
+        #     "aggs": {
+        #         "group1_term": {
+        #             "terms": {"field": "group1"},
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
         #                 }
         #             }
         #         }
@@ -506,16 +506,16 @@ class Test(unittest.TestCase):
     def test_terms_numeric(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'val_terms': {
-        #             'terms': {'field': 'val'},
-        #             'aggs': {
-        #                 'val_sum': {
-        #                     'sum': {'field': 'val'}
+        #     "aggs": {
+        #         "val_terms": {
+        #             "terms": {"field": "val"},
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
         #                 }
         #             }
         #         }
@@ -583,22 +583,22 @@ class Test(unittest.TestCase):
     def test_nested_terms(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'group1_term': {
-        #             'terms': {'field': 'group1'},
-        #             'aggs': {
-        #                 'val_sum': {
-        #                     'sum': {'field': 'val'}
+        #     "aggs": {
+        #         "group1_term": {
+        #             "terms": {"field": "group1"},
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
         #                 },
-        #                 'group2_term': {
-        #                     'terms': {'field': 'group2'},
-        #                     'aggs': {
-        #                         'val_sum': {
-        #                             'sum': {'field': 'val'}
+        #                 "group2_term": {
+        #                     "terms": {"field": "group2"},
+        #                     "aggs": {
+        #                         "val_sum": {
+        #                             "sum": {"field": "val"}
         #                         }
         #                     }
         #                 }
