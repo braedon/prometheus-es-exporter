@@ -594,16 +594,16 @@ class Test(unittest.TestCase):
             'jvm_mem_pools_peak_max_in_bytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",pool="old"}': 1798569984,
             'jvm_threads_count{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 40,
             'jvm_threads_peak_count{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 46,
-            'jvm_gc_collectors_collection_count{collector="young",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 2,
-            'jvm_gc_collectors_collection_time_in_millis{collector="young",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 189,
-            'jvm_gc_collectors_collection_count{collector="old",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 1,
-            'jvm_gc_collectors_collection_time_in_millis{collector="old",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 143,
-            'jvm_buffer_pools_count{buffer_pool="direct",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 29,
-            'jvm_buffer_pools_used_in_bytes{buffer_pool="direct",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 87069546,
-            'jvm_buffer_pools_total_capacity_in_bytes{buffer_pool="direct",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 87069545,
-            'jvm_buffer_pools_count{buffer_pool="mapped",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 3,
-            'jvm_buffer_pools_used_in_bytes{buffer_pool="mapped",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 9658,
-            'jvm_buffer_pools_total_capacity_in_bytes{buffer_pool="mapped",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 9658,
+            'jvm_gc_collectors_collection_count{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",collector="young"}': 2,
+            'jvm_gc_collectors_collection_time_in_millis{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",collector="young"}': 189,
+            'jvm_gc_collectors_collection_count{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",collector="old"}': 1,
+            'jvm_gc_collectors_collection_time_in_millis{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",collector="old"}': 143,
+            'jvm_buffer_pools_count{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",buffer_pool="direct"}': 29,
+            'jvm_buffer_pools_used_in_bytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",buffer_pool="direct"}': 87069546,
+            'jvm_buffer_pools_total_capacity_in_bytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",buffer_pool="direct"}': 87069545,
+            'jvm_buffer_pools_count{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",buffer_pool="mapped"}': 3,
+            'jvm_buffer_pools_used_in_bytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",buffer_pool="mapped"}': 9658,
+            'jvm_buffer_pools_total_capacity_in_bytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",buffer_pool="mapped"}': 9658,
             'jvm_classes_current_loaded_count{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 10236,
             'jvm_classes_total_loaded_count{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 10236,
             'jvm_classes_total_unloaded_count{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 0,
@@ -697,11 +697,11 @@ class Test(unittest.TestCase):
             'fs_data_total_in_bytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",path="/usr/share/elasticsearch/data/nodes/0"}': 233134567424,
             'fs_data_free_in_bytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",path="/usr/share/elasticsearch/data/nodes/0"}': 92206276608,
             'fs_data_available_in_bytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",path="/usr/share/elasticsearch/data/nodes/0"}': 80292356096,
-            'fs_io_stats_devices_operations{device_name="dm-0",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 22045,
-            'fs_io_stats_devices_read_operations{device_name="dm-0",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 14349,
-            'fs_io_stats_devices_write_operations{device_name="dm-0",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 7696,
-            'fs_io_stats_devices_read_kilobytes{device_name="dm-0",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 294732,
-            'fs_io_stats_devices_write_kilobytes{device_name="dm-0",node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 113424,
+            'fs_io_stats_devices_operations{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",device_name="dm-0"}': 22045,
+            'fs_io_stats_devices_read_operations{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",device_name="dm-0"}': 14349,
+            'fs_io_stats_devices_write_operations{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",device_name="dm-0"}': 7696,
+            'fs_io_stats_devices_read_kilobytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",device_name="dm-0"}': 294732,
+            'fs_io_stats_devices_write_kilobytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",device_name="dm-0"}': 113424,
             'fs_io_stats_total_operations{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 22045,
             'fs_io_stats_total_read_operations{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 14349,
             'fs_io_stats_total_write_operations{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 7696,
@@ -741,7 +741,7 @@ class Test(unittest.TestCase):
             'ingest_total_failed{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z"}': 0,
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
 
 if __name__ == '__main__':

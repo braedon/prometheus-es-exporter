@@ -40,7 +40,7 @@ class Test(unittest.TestCase):
             'took_milliseconds': 1
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     # effectively tests other singe-value metrics: max,min,sum,cardinality
     def test_avg(self):
@@ -82,7 +82,7 @@ class Test(unittest.TestCase):
             'val_avg_value': 2
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     # effecively tests other mult-value metrics: percentile_ranks
     def test_percentiles(self):
@@ -138,7 +138,7 @@ class Test(unittest.TestCase):
             'val_percentiles_values_99_0': 2.98
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_stats(self):
         # Query:
@@ -187,7 +187,7 @@ class Test(unittest.TestCase):
             'val_stats_sum': 6.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_extended_stats(self):
         # Query:
@@ -249,7 +249,7 @@ class Test(unittest.TestCase):
 
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_filter(self):
         # Query:
@@ -299,7 +299,7 @@ class Test(unittest.TestCase):
             'group1_filter_val_sum_value': 3.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_filters(self):
         # Query:
@@ -366,7 +366,7 @@ class Test(unittest.TestCase):
             'group_filter_val_sum_value{group_filter="group_b"}': 3.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_filters_anonymous(self):
         # Query:
@@ -433,7 +433,7 @@ class Test(unittest.TestCase):
             'group_filter_val_sum_value{group_filter="filter_1"}': 3.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_terms(self):
         # Query:
@@ -501,7 +501,7 @@ class Test(unittest.TestCase):
             'group1_term_val_sum_value{group1_term="b"}': 3.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_terms_numeric(self):
         # Query:
@@ -578,7 +578,7 @@ class Test(unittest.TestCase):
             'val_terms_val_sum_value{val_terms="3"}': 3.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_nested_terms(self):
         # Query:
@@ -697,7 +697,7 @@ class Test(unittest.TestCase):
             'group1_term_group2_term_val_sum_value{group1_term="b",group2_term="b"}': 3.0,
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     # Tests handling of disallowed characters in labels and metric names
     # The '-'s in the aggregation name aren't allowed in metric names or
@@ -771,7 +771,7 @@ class Test(unittest.TestCase):
             '__group_filter_1_val_sum_value{_group_filter_1="group_b"}': 3.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
 
 if __name__ == '__main__':
