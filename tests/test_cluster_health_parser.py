@@ -140,7 +140,7 @@ class Test(unittest.TestCase):
             'indices_shards_unassigned_shards{index="foo",shard="4"}': 1,
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
 
 if __name__ == '__main__':

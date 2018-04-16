@@ -15,9 +15,9 @@ class Test(unittest.TestCase):
     def test_query(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     }
         # }
         response = {
@@ -40,19 +40,19 @@ class Test(unittest.TestCase):
             'took_milliseconds': 1
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     # effectively tests other singe-value metrics: max,min,sum,cardinality
     def test_avg(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'val_avg': {
-        #             'avg': {'field': 'val'}
+        #     "aggs": {
+        #         "val_avg": {
+        #             "avg": {"field": "val"}
         #         }
         #     }
         # }
@@ -82,19 +82,19 @@ class Test(unittest.TestCase):
             'val_avg_value': 2
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     # effecively tests other mult-value metrics: percentile_ranks
     def test_percentiles(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'val_percentiles': {
-        #             'percentiles': {'field': 'val'}
+        #     "aggs": {
+        #         "val_percentiles": {
+        #             "percentiles": {"field": "val"}
         #         }
         #     }
         # }
@@ -138,18 +138,18 @@ class Test(unittest.TestCase):
             'val_percentiles_values_99_0': 2.98
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_stats(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'val_stats': {
-        #             'stats': {'field': 'val'}
+        #     "aggs": {
+        #         "val_stats": {
+        #             "stats": {"field": "val"}
         #         }
         #     }
         # }
@@ -187,18 +187,18 @@ class Test(unittest.TestCase):
             'val_stats_sum': 6.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_extended_stats(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'val_extended_stats': {
-        #             'extended_stats': {'field': 'val'}
+        #     "aggs": {
+        #         "val_extended_stats": {
+        #             "extended_stats": {"field": "val"}
         #         }
         #     }
         # }
@@ -249,21 +249,21 @@ class Test(unittest.TestCase):
 
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_filter(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'group1_filter': {
-        #             'filter': {'term': {'group1': 'a'}},
-        #             'aggs': {
-        #                 'val_sum': {
-        #                     'sum': {'field': 'val'}
+        #     "aggs": {
+        #         "group1_filter": {
+        #             "filter": {"term": {"group1": "a"}},
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
         #                 }
         #             }
         #         }
@@ -299,26 +299,26 @@ class Test(unittest.TestCase):
             'group1_filter_val_sum_value': 3.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_filters(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'group_filter': {
-        #             'filters': {
-        #                 'filters': {
-        #                     'group_a': {'term': {'group1': 'a'}},
-        #                     'group_b': {'term': {'group1': 'b'}}
+        #     "aggs": {
+        #         "group_filter": {
+        #             "filters": {
+        #                 "filters": {
+        #                     "group_a": {"term": {"group1": "a"}},
+        #                     "group_b": {"term": {"group1": "b"}}
         #                 }
         #             },
-        #             'aggs': {
-        #                 'val_sum': {
-        #                     'sum': {'field': 'val'}
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
         #                 }
         #             }
         #         }
@@ -366,26 +366,26 @@ class Test(unittest.TestCase):
             'group_filter_val_sum_value{group_filter="group_b"}': 3.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_filters_anonymous(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'group_filter': {
-        #             'filters': {
-        #                 'filters': [
-        #                     {'term': {'group1': 'a'}},
-        #                     {'term': {'group1': 'b'}}
+        #     "aggs": {
+        #         "group_filter": {
+        #             "filters": {
+        #                 "filters": [
+        #                     {"term": {"group1": "a"}},
+        #                     {"term": {"group1": "b"}}
         #                 ]
         #             },
-        #             'aggs': {
-        #                 'val_sum': {
-        #                     'sum': {'field': 'val'}
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
         #                 }
         #             }
         #         }
@@ -433,21 +433,21 @@ class Test(unittest.TestCase):
             'group_filter_val_sum_value{group_filter="filter_1"}': 3.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_terms(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'group1_term': {
-        #             'terms': {'field': 'group1'},
-        #             'aggs': {
-        #                 'val_sum': {
-        #                     'sum': {'field': 'val'}
+        #     "aggs": {
+        #         "group1_term": {
+        #             "terms": {"field": "group1"},
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
         #                 }
         #             }
         #         }
@@ -501,21 +501,21 @@ class Test(unittest.TestCase):
             'group1_term_val_sum_value{group1_term="b"}': 3.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_terms_numeric(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'val_terms': {
-        #             'terms': {'field': 'val'},
-        #             'aggs': {
-        #                 'val_sum': {
-        #                     'sum': {'field': 'val'}
+        #     "aggs": {
+        #         "val_terms": {
+        #             "terms": {"field": "val"},
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
         #                 }
         #             }
         #         }
@@ -578,27 +578,27 @@ class Test(unittest.TestCase):
             'val_terms_val_sum_value{val_terms="3"}': 3.0
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_nested_terms(self):
         # Query:
         # {
-        #     'size': 0,
-        #     'query': {
-        #         'match_all': {}
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
         #     },
-        #     'aggs': {
-        #         'group1_term': {
-        #             'terms': {'field': 'group1'},
-        #             'aggs': {
-        #                 'val_sum': {
-        #                     'sum': {'field': 'val'}
+        #     "aggs": {
+        #         "group1_term": {
+        #             "terms": {"field": "group1"},
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
         #                 },
-        #                 'group2_term': {
-        #                     'terms': {'field': 'group2'},
-        #                     'aggs': {
-        #                         'val_sum': {
-        #                             'sum': {'field': 'val'}
+        #                 "group2_term": {
+        #                     "terms": {"field": "group2"},
+        #                     "aggs": {
+        #                         "val_sum": {
+        #                             "sum": {"field": "val"}
         #                         }
         #                     }
         #                 }
@@ -697,7 +697,81 @@ class Test(unittest.TestCase):
             'group1_term_group2_term_val_sum_value{group1_term="b",group2_term="b"}': 3.0,
         }
         result = convert_result(parse_response(response))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
+
+    # Tests handling of disallowed characters in labels and metric names
+    # The '-'s in the aggregation name aren't allowed in metric names or
+    # label keys, so need to be substituted.
+    # The number at the start of the aggregation name isn't allowed at
+    # the start of metric names or label keys.
+    # A double '_' at the start of the label key (post substitutions)
+    # is also not allowed.
+    def test_bad_chars(self):
+        # Query:
+        # {
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
+        #     },
+        #     "aggs": {
+        #         "1-group-filter-1": {
+        #             "filters": {
+        #                 "filters": {
+        #                     "group_a": {"term": {"group1": "a"}},
+        #                     "group_b": {"term": {"group1": "b"}}
+        #                 }
+        #             },
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
+        #                 }
+        #             }
+        #         }
+        #     }
+        # }
+        response = {
+            "_shards": {
+                "failed": 0,
+                "successful": 5,
+                "total": 5
+            },
+            "aggregations": {
+                "1-group-filter-1": {
+                    "buckets": {
+                        "group_a": {
+                            "doc_count": 2,
+                            "val_sum": {
+                                "value": 3.0
+                            }
+                        },
+                        "group_b": {
+                            "doc_count": 1,
+                            "val_sum": {
+                                "value": 3.0
+                            }
+                        }
+                    }
+                }
+            },
+            "hits": {
+                "hits": [],
+                "max_score": 0.0,
+                "total": 3
+            },
+            "timed_out": False,
+            "took": 1
+        }
+
+        expected = {
+            'hits': 3,
+            'took_milliseconds': 1,
+            '__group_filter_1_doc_count{_group_filter_1="group_a"}': 2,
+            '__group_filter_1_doc_count{_group_filter_1="group_b"}': 1,
+            '__group_filter_1_val_sum_value{_group_filter_1="group_a"}': 3.0,
+            '__group_filter_1_val_sum_value{_group_filter_1="group_b"}': 3.0
+        }
+        result = convert_result(parse_response(response))
+        self.assertEqual(expected, result)
 
 
 if __name__ == '__main__':

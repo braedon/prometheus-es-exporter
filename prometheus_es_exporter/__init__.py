@@ -2,6 +2,7 @@ import argparse
 import configparser
 import json
 import logging
+import re
 import sched
 import signal
 import sys
@@ -21,27 +22,44 @@ from prometheus_es_exporter.parser import parse_response
 
 gauges = {}
 
+metric_invalid_chars = re.compile(r'[^a-zA-Z0-9_:]')
+metric_invalid_start_chars = re.compile(r'^[^a-zA-Z_:]')
+label_invalid_chars = re.compile(r'[^a-zA-Z0-9_]')
+label_invalid_start_chars = re.compile(r'^[^a-zA-Z_]')
+label_start_double_under = re.compile(r'^__+')
+
+
+def format_label_key(label_key):
+    label_key = re.sub(label_invalid_chars, '_', label_key)
+    label_key = re.sub(label_invalid_start_chars, '_', label_key)
+    label_key = re.sub(label_start_double_under, '_', label_key)
+    return label_key
+
 
 def format_label_value(value_list):
-    return '_'.join(value_list).replace('.', '_')
+    return '_'.join(value_list)
 
 
 def format_metric_name(name_list):
-    return '_'.join(name_list).replace('.', '_')
+    metric = '_'.join(name_list)
+    metric = re.sub(metric_invalid_chars, '_', metric)
+    metric = re.sub(metric_invalid_start_chars, '_', metric)
+    return metric
 
 
 def group_metrics(metrics):
     metric_dict = {}
     for (name_list, label_dict, value) in metrics:
         metric_name = format_metric_name(name_list)
+        label_dict = {format_label_key(k): format_label_value(v)
+                      for k, v in label_dict.items()}
+
         if metric_name not in metric_dict:
             metric_dict[metric_name] = (tuple(label_dict.keys()), {})
 
         label_keys = metric_dict[metric_name][0]
-        label_values = tuple([
-            format_label_value(label_dict[key])
-            for key in label_keys
-        ])
+        label_values = tuple([label_dict[key]
+                              for key in label_keys])
 
         metric_dict[metric_name][1][label_values] = value
 

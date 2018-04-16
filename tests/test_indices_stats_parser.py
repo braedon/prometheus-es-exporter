@@ -591,8 +591,8 @@ class Test(unittest.TestCase):
             'primaries_query_cache_evictions{index="_all"}': 0,
             'primaries_fielddata_memory_size_in_bytes{index="_all"}': 0,
             'primaries_fielddata_evictions{index="_all"}': 0,
-            'primaries_fielddata_fields_memory_size_in_bytes{field="group1",index="_all"}': 1024,
-            'primaries_fielddata_fields_memory_size_in_bytes{field="group2",index="_all"}': 2048,
+            'primaries_fielddata_fields_memory_size_in_bytes{index="_all",field="group1"}': 1024,
+            'primaries_fielddata_fields_memory_size_in_bytes{index="_all",field="group2"}': 2048,
             'primaries_completion_size_in_bytes{index="_all"}': 0,
             'primaries_segments_count{index="_all"}': 3,
             'primaries_segments_memory_in_bytes{index="_all"}': 7908,
@@ -675,8 +675,8 @@ class Test(unittest.TestCase):
             'total_query_cache_evictions{index="_all"}': 0,
             'total_fielddata_memory_size_in_bytes{index="_all"}': 0,
             'total_fielddata_evictions{index="_all"}': 0,
-            'total_fielddata_fields_memory_size_in_bytes{field="group1",index="_all"}': 1024,
-            'total_fielddata_fields_memory_size_in_bytes{field="group2",index="_all"}': 2048,
+            'total_fielddata_fields_memory_size_in_bytes{index="_all",field="group1"}': 1024,
+            'total_fielddata_fields_memory_size_in_bytes{index="_all",field="group2"}': 2048,
             'total_completion_size_in_bytes{index="_all"}': 0,
             'total_segments_count{index="_all"}': 3,
             'total_segments_memory_in_bytes{index="_all"}': 7908,
@@ -701,7 +701,7 @@ class Test(unittest.TestCase):
             'total_recovery_throttle_time_in_millis{index="_all"}': 0,
         }
         result = convert_result(parse_response(self.response, parse_indices=False))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
     def test_endpoint_indices(self):
 
@@ -766,8 +766,8 @@ class Test(unittest.TestCase):
             'primaries_query_cache_evictions{index="foo"}': 0,
             'primaries_fielddata_memory_size_in_bytes{index="foo"}': 0,
             'primaries_fielddata_evictions{index="foo"}': 0,
-            'primaries_fielddata_fields_memory_size_in_bytes{field="group1",index="foo"}': 1024,
-            'primaries_fielddata_fields_memory_size_in_bytes{field="group2",index="foo"}': 2048,
+            'primaries_fielddata_fields_memory_size_in_bytes{index="foo",field="group1"}': 1024,
+            'primaries_fielddata_fields_memory_size_in_bytes{index="foo",field="group2"}': 2048,
             'primaries_completion_size_in_bytes{index="foo"}': 0,
             'primaries_segments_count{index="foo"}': 3,
             'primaries_segments_memory_in_bytes{index="foo"}': 7908,
@@ -850,8 +850,8 @@ class Test(unittest.TestCase):
             'total_query_cache_evictions{index="foo"}': 0,
             'total_fielddata_memory_size_in_bytes{index="foo"}': 0,
             'total_fielddata_evictions{index="foo"}': 0,
-            'total_fielddata_fields_memory_size_in_bytes{field="group1",index="foo"}': 1024,
-            'total_fielddata_fields_memory_size_in_bytes{field="group2",index="foo"}': 2048,
+            'total_fielddata_fields_memory_size_in_bytes{index="foo",field="group1"}': 1024,
+            'total_fielddata_fields_memory_size_in_bytes{index="foo",field="group2"}': 2048,
             'total_completion_size_in_bytes{index="foo"}': 0,
             'total_segments_count{index="foo"}': 3,
             'total_segments_memory_in_bytes{index="foo"}': 7908,
@@ -876,7 +876,7 @@ class Test(unittest.TestCase):
             'total_recovery_throttle_time_in_millis{index="foo"}': 0,
         }
         result = convert_result(parse_response(self.response, parse_indices=True))
-        self.assertEqual(result, expected)
+        self.assertEqual(expected, result)
 
 
 if __name__ == '__main__':
