@@ -295,6 +295,10 @@ def main():
                         help='path to a CA certificate bundle. Can be absolute, or relative to the current working directory. If not specified, SSL certificate verification is disabled.')
     parser.add_argument('-p', '--port', type=int, default=9206,
                         help='port to serve the metrics endpoint on. (default: 9206)')
+    parser.add_argument('-u', '--user', default='',
+                        help='User for authentication. (default: no user)')
+    parser.add_argument('-P', '--password', default = '',
+                        help='Password for authentication. (default: no password)')
     parser.add_argument('--query-disable', action='store_true',
                         help='disable query monitoring. Config file does not need to be present if query monitoring is disabled.')
     parser.add_argument('-c', '--config-file', default='exporter.cfg',
@@ -344,9 +348,9 @@ def main():
     port = args.port
     es_cluster = args.es_cluster.split(',')
     if args.ca_certs:
-        es_client = Elasticsearch(es_cluster, verify_certs=True, ca_certs=args.ca_certs)
+        es_client = Elasticsearch(es_cluster, verify_certs=True, ca_certs=args.ca_certs, http_auth=(args.user, args.password))
     else:
-        es_client = Elasticsearch(es_cluster, verify_certs=False)
+        es_client = Elasticsearch(es_cluster, verify_certs=False, http_auth=(args.user, args.password))
 
     scheduler = None
 
