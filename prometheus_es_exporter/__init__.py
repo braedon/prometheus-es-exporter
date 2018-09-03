@@ -295,6 +295,10 @@ def main():
                         help='path to a CA certificate bundle. Can be absolute, or relative to the current working directory. If not specified, SSL certificate verification is disabled.')
     parser.add_argument('-p', '--port', type=int, default=9206,
                         help='port to serve the metrics endpoint on. (default: 9206)')
+    parser.add_argument('--basic-user',
+                        help='User for authentication. (default: no user)')
+    parser.add_argument('--basic-password',
+                        help='Password for authentication. (default: no password)')
     parser.add_argument('--query-disable', action='store_true',
                         help='disable query monitoring. Config file does not need to be present if query monitoring is disabled.')
     parser.add_argument('-c', '--config-file', default='exporter.cfg',
@@ -329,6 +333,15 @@ def main():
                         help='turn on verbose (DEBUG) logging. Overrides --log-level.')
     args = parser.parse_args()
 
+    if args.basic_user and args.basic_password is None:
+        parser.error('Username provided with no password.')
+    elif args.basic_user is None and args.basic_password:
+        parser.error('Password provided with no username.')
+    elif args.basic_user:
+        http_auth = (args.basic_user, args.basic_password)
+    else:
+        http_auth = None
+
     log_handler = logging.StreamHandler()
     log_format = '[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s'
     formatter = JogFormatter(log_format) if args.json_logging else logging.Formatter(log_format)
@@ -343,10 +356,11 @@ def main():
 
     port = args.port
     es_cluster = args.es_cluster.split(',')
+
     if args.ca_certs:
-        es_client = Elasticsearch(es_cluster, verify_certs=True, ca_certs=args.ca_certs)
+        es_client = Elasticsearch(es_cluster, verify_certs=True, ca_certs=args.ca_certs, http_auth=http_auth)
     else:
-        es_client = Elasticsearch(es_cluster, verify_certs=False)
+        es_client = Elasticsearch(es_cluster, verify_certs=False, http_auth=http_auth)
 
     scheduler = None
 
