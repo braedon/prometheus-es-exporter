@@ -25,7 +25,7 @@ def format_metrics(metric_name, label_keys, value_dict):
 
 # Converts the parse_response() result into a psuedo-prometheus format
 # that is useful for comparing results in tests.
-# Uses the 'grop_metrics()' function used by the exporter, so effectively
+# Uses the 'group_metrics()' function used by the exporter, so effectively
 # tests that function.
 def convert_result(result):
     metric_dict = group_metrics(result)

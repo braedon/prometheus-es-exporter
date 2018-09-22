@@ -1,4 +1,5 @@
-from .utils import merge_dicts
+from collections import OrderedDict
+from .utils import merge_dicts_ordered
 
 singular_forms = {
     'pools': 'pool',
@@ -20,7 +21,12 @@ bucket_list_keys = {
 }
 
 
-def parse_block(block, metric=[], labels={}):
+def parse_block(block, metric=None, labels=None):
+    if metric is None:
+        metric = []
+    if labels is None:
+        labels = OrderedDict()
+
     result = []
 
     for key, value in block.items():
@@ -36,7 +42,7 @@ def parse_block(block, metric=[], labels={}):
                     else:
                         singular_key = key
                     for n_key, n_value in value.items():
-                        result.extend(parse_block(n_value, metric=metric + [key], labels=merge_dicts(labels, {singular_key: [n_key]})))
+                        result.extend(parse_block(n_value, metric=metric + [key], labels=merge_dicts_ordered(labels, {singular_key: [n_key]})))
                 else:
                     result.extend(parse_block(value, metric=metric + [key], labels=labels))
             elif isinstance(value, list) and key in bucket_list_keys:
@@ -44,22 +50,30 @@ def parse_block(block, metric=[], labels={}):
 
                 for n_value in value:
                     bucket_name = n_value[bucket_name_key]
-                    result.extend(parse_block(n_value, metric=metric + [key], labels=merge_dicts(labels, {bucket_name_key: [bucket_name]})))
+                    result.extend(parse_block(n_value, metric=metric + [key], labels=merge_dicts_ordered(labels, {bucket_name_key: [bucket_name]})))
 
     return result
 
 
-def parse_node(node, metric=[], labels={}):
-    labels = merge_dicts(labels, node_name=[node['name']])
+def parse_node(node, metric=None, labels=None):
+    if metric is None:
+        metric = []
+    if labels is None:
+        labels = OrderedDict()
+
+    labels = merge_dicts_ordered(labels, node_name=[node['name']])
 
     return parse_block(node, metric=metric, labels=labels)
 
 
-def parse_response(response, metric=[]):
+def parse_response(response, metric=None):
+    if metric is None:
+        metric = []
+
     result = []
 
     if '_nodes' not in response or not response['_nodes']['failed']:
         for key, value in response['nodes'].items():
-            result.extend(parse_node(value, metric=metric, labels={'node_id': [key]}))
+            result.extend(parse_node(value, metric=metric, labels=OrderedDict({'node_id': [key]})))
 
     return result

@@ -1,4 +1,12 @@
-def parse_buckets(agg_key, buckets, metric=[], labels={}):
+from collections import OrderedDict
+
+
+def parse_buckets(agg_key, buckets, metric=None, labels=None):
+    if metric is None:
+        metric = []
+    if labels is None:
+        labels = OrderedDict()
+
     result = []
 
     for index, bucket in enumerate(buckets):
@@ -23,7 +31,12 @@ def parse_buckets(agg_key, buckets, metric=[], labels={}):
     return result
 
 
-def parse_buckets_fixed(agg_key, buckets, metric=[], labels={}):
+def parse_buckets_fixed(agg_key, buckets, metric=None, labels=None):
+    if metric is None:
+        metric = []
+    if labels is None:
+        labels = OrderedDict()
+
     result = []
 
     for bucket_key, bucket in buckets.items():
@@ -39,7 +52,12 @@ def parse_buckets_fixed(agg_key, buckets, metric=[], labels={}):
     return result
 
 
-def parse_agg(agg_key, agg, metric=[], labels={}):
+def parse_agg(agg_key, agg, metric=None, labels=None):
+    if metric is None:
+        metric = []
+    if labels is None:
+        labels = OrderedDict()
+
     result = []
 
     for key, value in agg.items():
@@ -55,7 +73,10 @@ def parse_agg(agg_key, agg, metric=[], labels={}):
     return result
 
 
-def parse_response(response, metric=[]):
+def parse_response(response, metric=None):
+    if metric is None:
+        metric = []
+
     result = []
 
     if not response['timed_out']:

@@ -1,4 +1,5 @@
-from .utils import merge_dicts
+from collections import OrderedDict
+from .utils import merge_dicts_ordered
 
 singular_forms = {
     'fields': 'field'
@@ -10,7 +11,12 @@ bucket_dict_keys = [
 bucket_list_keys = {}
 
 
-def parse_block(block, metric=[], labels={}):
+def parse_block(block, metric=None, labels=None):
+    if metric is None:
+        metric = []
+    if labels is None:
+        labels = OrderedDict()
+
     result = []
 
     for key, value in block.items():
@@ -26,7 +32,7 @@ def parse_block(block, metric=[], labels={}):
                     else:
                         singular_key = key
                     for n_key, n_value in value.items():
-                        result.extend(parse_block(n_value, metric=metric + [key], labels=merge_dicts(labels, {singular_key: [n_key]})))
+                        result.extend(parse_block(n_value, metric=metric + [key], labels=merge_dicts_ordered(labels, {singular_key: [n_key]})))
                 else:
                     result.extend(parse_block(value, metric=metric + [key], labels=labels))
             elif isinstance(value, list) and key in bucket_list_keys:
@@ -34,19 +40,22 @@ def parse_block(block, metric=[], labels={}):
 
                 for n_value in value:
                     bucket_name = n_value[bucket_name_key]
-                    result.extend(parse_block(n_value, metric=metric + [key], labels=merge_dicts(labels, {bucket_name_key: [bucket_name]})))
+                    result.extend(parse_block(n_value, metric=metric + [key], labels=merge_dicts_ordered(labels, {bucket_name_key: [bucket_name]})))
 
     return result
 
 
-def parse_response(response, parse_indices=False, metric=[]):
+def parse_response(response, parse_indices=False, metric=None):
+    if metric is None:
+        metric = []
+
     result = []
 
     if '_shards' not in response or not response['_shards']['failed']:
         if parse_indices:
             for key, value in response['indices'].items():
-                result.extend(parse_block(value, metric=metric, labels={'index': [key]}))
+                result.extend(parse_block(value, metric=metric, labels=OrderedDict({'index': [key]})))
         else:
-            result.extend(parse_block(response['_all'], metric=metric, labels={'index': ['_all']}))
+            result.extend(parse_block(response['_all'], metric=metric, labels=OrderedDict({'index': ['_all']})))
 
     return result

@@ -8,6 +8,7 @@ import signal
 import sys
 import time
 
+from collections import OrderedDict
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConnectionTimeout
 from functools import partial
@@ -51,8 +52,8 @@ def group_metrics(metrics):
     metric_dict = {}
     for (name_list, label_dict, value) in metrics:
         metric_name = format_metric_name(name_list)
-        label_dict = {format_label_key(k): format_label_value(v)
-                      for k, v in label_dict.items()}
+        label_dict = OrderedDict([(format_label_key(k), format_label_value(v))
+                                  for k, v in label_dict.items()])
 
         if metric_name not in metric_dict:
             metric_dict[metric_name] = (tuple(label_dict.keys()), {})
