@@ -5,6 +5,8 @@ python:
   - "3.6"
 script:
   - python setup.py test
+after_success:
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.6* ]]; then export RELEASE_SENTINEL=1; fi
 deploy:
   provider: pypi
   user: $PYPI_USERNAME
@@ -12,3 +14,5 @@ deploy:
   distributions: "sdist bdist_wheel"
   on:
     tags: true
+    branch: master
+    condition: $RELEASE_SENTINEL = 1
