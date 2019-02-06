@@ -1,4 +1,7 @@
-FROM python:3-slim
+# Pin to 3.6, as prometheus-client has a memory leak in 3.7
+# https://github.com/prometheus/client_python/issues/340
+# TODO: unpin when patched prometheus-client version is released
+FROM python:3.6-slim
 
 WORKDIR /usr/src/app
 
