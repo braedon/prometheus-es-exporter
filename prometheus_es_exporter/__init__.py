@@ -90,6 +90,9 @@ def update_gauges(metrics):
 
         gauges[metric_name] = (new_label_values_set, gauge)
 
+def zero_gauges():
+    for metric_name, (new_label_values_set, gauge) in gauges.items():
+        gauge.set(0)
 
 def gauge_generator(metrics):
     metric_dict = group_metrics(metrics)
@@ -117,6 +120,7 @@ def run_query(es_client, name, indices, query, timeout):
         metrics = parse_response(response, [name])
     except Exception:
         logging.exception('Error while querying indices [%s], query [%s].', indices, query)
+        zero_gauges()
     else:
         update_gauges(metrics)
 
