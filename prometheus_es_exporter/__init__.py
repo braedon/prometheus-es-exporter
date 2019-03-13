@@ -91,7 +91,7 @@ def update_gauges(metrics):
         gauges[metric_name] = (new_label_values_set, gauge)
 
 def zero_gauges():
-    for metric_name, (new_label_values_set, gauge) in gauges.items():
+    for (label_values_set, gauge) in gauges.values():
         gauge.set(0)
 
 def gauge_generator(metrics):
@@ -113,14 +113,15 @@ def gauge_generator(metrics):
         yield gauge
 
 
-def run_query(es_client, name, indices, query, timeout):
+def run_query(es_client, name, indices, query, timeout, zero_query_gauges_on_exception):
     try:
         response = es_client.search(index=indices, body=query, request_timeout=timeout)
 
         metrics = parse_response(response, [name])
     except Exception:
         logging.exception('Error while querying indices [%s], query [%s].', indices, query)
-        zero_gauges()
+        if zero_query_gauges_on_exception:
+            zero_gauges()
     else:
         update_gauges(metrics)
 
@@ -330,6 +331,8 @@ def main():
                         help='limit indices stats to specific metrics. Metrics should be separated by commas e.g. indices,fs.')
     parser.add_argument('--indices-stats-fields', type=indices_stats_fields_parser,
                         help='include fielddata info for specific fields. Fields should be separated by commas e.g. indices,fs. Use \'*\' for all.')
+    parser.add_argument('--zero-query-gauges-on-exception', action='store_true',
+                        help='set query gauges to zero after got exception on Elasticsearch query. (default: false)')
     parser.add_argument('-j', '--json-logging', action='store_true',
                         help='turn on json logging.')
     parser.add_argument('--log-level', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -384,12 +387,13 @@ def main():
                 query_timeout = config.getfloat(section, 'QueryTimeoutSecs', fallback=10)
                 query_indices = config.get(section, 'QueryIndices', fallback='_all')
                 query = json.loads(config.get(section, 'QueryJson'))
+                zero_query_gauges_on_exception = args.zero_query_gauges_on_exception
 
-                queries[query_name] = (query_interval, query_timeout, query_indices, query)
+                queries[query_name] = (query_interval, query_timeout, query_indices, query, zero_query_gauges_on_exception)
 
         if queries:
-            for name, (interval, timeout, indices, query) in queries.items():
-                func = partial(run_query, es_client, name, indices, query, timeout)
+            for name, (interval, timeout, indices, query, zero_query_gauges_on_exception) in queries.items():
+                func = partial(run_query, es_client, name, indices, query, timeout, zero_query_gauges_on_exception)
                 run_scheduler(scheduler, interval, func)
         else:
             logging.warn('No queries found in config file %s', args.config_file)
