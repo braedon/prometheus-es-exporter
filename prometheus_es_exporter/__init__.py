@@ -292,6 +292,10 @@ def main():
     parser = argparse.ArgumentParser(description='Export ES query results to Prometheus.')
     parser.add_argument('-e', '--es-cluster', default='localhost',
                         help='addresses of nodes in a Elasticsearch cluster to run queries on. Nodes should be separated by commas e.g. es1,es2. Ports can be provided if non-standard (9200) e.g. es1:9999 (default: localhost)')
+    parser.add_argument('--client-cert',
+                        help='Certificate for authentication. (default: no cert)')
+    parser.add_argument('--client-key',
+                        help='Key for authentication. (default: no key)')
     parser.add_argument('--ca-certs',
                         help='path to a CA certificate bundle. Can be absolute, or relative to the current working directory. If not specified, SSL certificate verification is disabled.')
     parser.add_argument('-p', '--port', type=int, default=9206,
@@ -304,6 +308,7 @@ def main():
                         help='disable query monitoring. Config file does not need to be present if query monitoring is disabled.')
     parser.add_argument('-c', '--config-file', default='exporter.cfg',
                         help='path to query config file. Can be absolute, or relative to the current working directory. (default: exporter.cfg)')
+
     parser.add_argument('--cluster-health-disable', action='store_true',
                         help='disable cluster health monitoring.')
     parser.add_argument('--cluster-health-timeout', type=float, default=10.0,
@@ -334,6 +339,7 @@ def main():
                         help='turn on verbose (DEBUG) logging. Overrides --log-level.')
     args = parser.parse_args()
 
+
     if args.basic_user and args.basic_password is None:
         parser.error('Username provided with no password.')
     elif args.basic_user is None and args.basic_password:
@@ -354,11 +360,18 @@ def main():
         level=logging.DEBUG if args.verbose else log_level
     )
     logging.captureWarnings(True)
-
     port = args.port
     es_cluster = args.es_cluster.split(',')
 
-    if args.ca_certs:
+    if args.client_cert and args.client_key and args.ca_certs:
+        es_client = Elasticsearch(es_cluster,
+                                  verify_certs=True,
+                                  scheme="https",
+                                  ca_certs=args.ca_certs,
+                                  client_cert=args.client_cert ,
+                                  client_key=args.client_key,
+                                  http_auth=http_auth)
+    elif args.ca_certs:
         es_client = Elasticsearch(es_cluster, verify_certs=True, ca_certs=args.ca_certs, http_auth=http_auth)
     else:
         es_client = Elasticsearch(es_cluster, verify_certs=False, http_auth=http_auth)
