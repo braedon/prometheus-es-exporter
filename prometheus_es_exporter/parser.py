@@ -80,7 +80,10 @@ def parse_response(response, metric=None):
     result = []
 
     if not response['timed_out']:
-        result.append((metric + ['hits'], {}, response['hits']['total']))
+        total = response['hits']['total']
+        # ES7 returns a dict with a 'value' key.
+        if type(total) == dict: total = total['value']
+        result.append((metric + ['hits'], {}, total))
         result.append((metric + ['took', 'milliseconds'], {}, response['took']))
 
         if 'aggregations' in response.keys():

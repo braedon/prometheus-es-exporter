@@ -42,6 +42,40 @@ class Test(unittest.TestCase):
         result = convert_result(parse_response(response))
         self.assertEqual(expected, result)
 
+    def test_query_es7(self):
+        # Query:
+        # {
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
+        #     }
+        # }
+        response = {
+            "_shards": {
+                "failed": 0,
+                "skipped": 0,
+                "successful": 1,
+                "total": 1
+            },
+            "hits": {
+                "hits": [],
+                "max_score": None,
+                "total": {
+                    "relation": "eq",
+                    "value": 3
+                }
+            },
+            "timed_out": False,
+            "took": 3
+        }
+
+        expected = {
+            'hits': 3,
+            'took_milliseconds': 3
+        }
+        result = convert_result(parse_response(response))
+        self.assertEqual(expected, result)
+
     # effectively tests other singe-value metrics: max,min,sum,cardinality
     def test_avg(self):
         # Query:
