@@ -251,6 +251,79 @@ class Test(unittest.TestCase):
         result = convert_result(parse_response(response))
         self.assertEqual(expected, result)
 
+    def test_extended_stats_on_datefield(self):
+        # Query:
+        # {
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
+        #     },
+        #     "aggs": {
+        #         "val_extended_stats": {
+        #             "extended_stats": {"field": "datefield"}
+        #         }
+        #     }
+        # }
+        response = {
+            "_shards": {
+                "failed": 0,
+                "skipped": 0,
+                "successful": 4,
+                "total": 4
+            },
+            "aggregations": {
+                "val_extended_stats": {
+                    "avg": 1563961007985.8281,
+                    "avg_as_string": "2019-07-24 09:36:47.985",
+                    "count": 11272,
+                    "max": 1563966361517.0,
+                    "max_as_string": "2019-07-24 11:06:01.517",
+                    "min": 1563956138081.0,
+                    "min_as_string": "2019-07-24 08:15:38.081",
+                    "std_deviation": 2838022.4407301634,
+                    "std_deviation_as_string": "1970-01-01 00:47:18.022",
+                    "std_deviation_bounds": {
+                        "lower": 1563955331940.9468,
+                        "upper": 1563966684030.7095
+                    },
+                    "std_deviation_bounds_as_string": {
+                        "lower": "2019-07-24 08:02:11.940",
+                        "upper": "2019-07-24 11:11:24.030"
+                    },
+                    "sum": 1.7628968482016256e+16,
+                    "sum_as_string": "560609-10-10 01:26:56.256",
+                    "sum_of_squares": 2.757101931697533e+28,
+                    "sum_of_squares_as_string": "292278994-08-17 07:12:55.807",
+                    "variance": 8054371374087.994,
+                    "variance_as_string": "2225-03-26 21:22:54.087"
+                }
+            },
+            "hits": {
+                "hits": [],
+                "max_score": 0.0,
+                "total": 11272
+            },
+            "timed_out": False,
+            "took": 7
+        }
+
+        expected = {
+            'hits': 11272,
+            'took_milliseconds': 7,
+            'val_extended_stats_avg': 1563961007985.8281,
+            'val_extended_stats_count': 11272,
+            'val_extended_stats_max': 1563966361517.0,
+            'val_extended_stats_min': 1563956138081.0,
+            'val_extended_stats_sum': 1.7628968482016256e+16,
+            'val_extended_stats_std_deviation': 2838022.4407301634,
+            'val_extended_stats_std_deviation_bounds_lower': 1563955331940.9468,
+            'val_extended_stats_std_deviation_bounds_upper': 1563966684030.7095,
+            'val_extended_stats_sum_of_squares': 2.757101931697533e+28,
+            'val_extended_stats_variance': 8054371374087.994,
+        }
+        result = convert_result(parse_response(response))
+        self.assertEqual(expected, result)
+
     def test_filter(self):
         # Query:
         # {

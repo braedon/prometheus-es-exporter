@@ -61,6 +61,8 @@ def parse_agg(agg_key, agg, metric=None, labels=None):
     result = []
 
     for key, value in agg.items():
+        if key.find('_as_string') >= 0: continue
+
         if key == 'buckets' and isinstance(value, list):
             result.extend(parse_buckets(agg_key, value, metric=metric, labels=labels))
         elif key == 'buckets' and isinstance(value, dict):
