@@ -67,7 +67,10 @@ def parse_agg(agg_key, agg, metric=None, labels=None):
             result.extend(parse_buckets_fixed(agg_key, value, metric=metric, labels=labels))
         elif isinstance(value, dict):
             result.extend(parse_agg(key, value, metric=metric + [key], labels=labels))
-        else:
+        # We only want numbers as metrics.
+        # Anything else (with the exception of sub-objects,
+        # which are handled above) is ignored.
+        elif isinstance(value, (int, float)):
             result.append((metric + [key], labels, value))
 
     return result
