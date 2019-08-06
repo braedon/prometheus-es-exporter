@@ -81,8 +81,10 @@ def parse_response(response, metric=None):
 
     if not response['timed_out']:
         total = response['hits']['total']
-        # ES7 returns a dict with a 'value' key.
-        if type(total) == dict: total = total['value']
+        # In ES7, hits.total changed from an integer to
+        # a dict with a 'value' key.
+        if isinstance(total, dict):
+            total = total['value']
         result.append((metric + ['hits'], {}, total))
         result.append((metric + ['took', 'milliseconds'], {}, response['took']))
 

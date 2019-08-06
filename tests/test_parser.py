@@ -42,6 +42,7 @@ class Test(unittest.TestCase):
         result = convert_result(parse_response(response))
         self.assertEqual(expected, result)
 
+    # ES7 changed the format of hits.total - this tests parsing the new format
     def test_query_es7(self):
         # Query:
         # {
