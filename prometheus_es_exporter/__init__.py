@@ -373,7 +373,7 @@ def main():
 
         config = configparser.ConfigParser()
         config.read_file(open(args.config_file))
-        config.read(glob.glob(f'{args.config_dir}/*.cfg'))
+        config.read(glob.glob('{}/*.cfg'.format(args.config_dir)))
 
         query_prefix = 'query_'
         queries = {}
