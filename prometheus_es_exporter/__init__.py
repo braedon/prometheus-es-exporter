@@ -293,25 +293,45 @@ def main():
 
     parser = argparse.ArgumentParser(description='Export ES query results to Prometheus.')
     parser.add_argument('-e', '--es-cluster', default='localhost',
-                        help='addresses of nodes in a Elasticsearch cluster to run queries on. Nodes should be separated by commas e.g. es1,es2. Ports can be provided if non-standard (9200) e.g. es1:9999 (default: localhost)')
+                        help='addresses of nodes in a Elasticsearch cluster to run queries on. '
+                             'Nodes should be separated by commas e.g. es1,es2. '
+                             'Ports can be provided if non-standard (9200) e.g. es1:9999. '
+                             'Include the scheme for non-http nodes e.g. https://es1:9200. '
+                             '--ca-certs must be provided for SSL certificate verification. '
+                             '(default: localhost)')
     parser.add_argument('--ca-certs',
-                        help='path to a CA certificate bundle. Can be absolute, or relative to the current working directory. If not specified, SSL certificate verification is disabled.')
+                        help='path to a CA certificate bundle. '
+                             'Can be absolute, or relative to the current working directory. '
+                             'If not specified, SSL certificate verification is disabled.')
     parser.add_argument('--client-cert',
-                        help='path to a SSL client certificate. Can be absolute, or relative to the current working directory. If not specified, SSL client authentication is disabled.')
+                        help='path to a SSL client certificate. '
+                             'Can be absolute, or relative to the current working directory. '
+                             'If not specified, SSL client authentication is disabled.')
     parser.add_argument('--client-key',
-                        help='path to a SSL client key. Can be absolute, or relative to the current working directory. Must be specified if "--client-cert" is provided.')
+                        help='path to a SSL client key. '
+                             'Can be absolute, or relative to the current working directory. '
+                             'Must be specified if "--client-cert" is provided.')
+    parser.add_argument('--basic-user',
+                        help='username for basic authentication with nodes. '
+                             'If not specified, basic authentication is disabled.')
+    parser.add_argument('--basic-password',
+                        help='password for basic authentication with nodes. '
+                             'Must be specified if "--basic-user" is provided.')
     parser.add_argument('-p', '--port', type=int, default=9206,
                         help='port to serve the metrics endpoint on. (default: 9206)')
-    parser.add_argument('--basic-user',
-                        help='User for authentication. (default: no user)')
-    parser.add_argument('--basic-password',
-                        help='Password for authentication. (default: no password)')
     parser.add_argument('--query-disable', action='store_true',
-                        help='disable query monitoring. Config file does not need to be present if query monitoring is disabled.')
+                        help='disable query monitoring. '
+                             'Config file does not need to be present if query monitoring is disabled.')
     parser.add_argument('-c', '--config-file', default='exporter.cfg',
-                        help='path to query config file. Can be absolute, or relative to the current working directory. (default: exporter.cfg)')
+                        help='path to query config file. '
+                             'Can be absolute, or relative to the current working directory. '
+                             '(default: exporter.cfg)')
     parser.add_argument('--config-dir', default='./config',
-                        help='path to query config directory. Besides including the single config file specified by "--config-file" at first, all config files in the config directory will be sorted, merged, then included. Can be absolute, or relative to the current working directory. (default: ./config)')
+                        help='path to query config directory. '
+                             'Besides including the single config file specified by "--config-file" at first, '
+                             'all config files in the config directory will be sorted, merged, then included. '
+                             'Can be absolute, or relative to the current working directory. '
+                             '(default: ./config)')
     parser.add_argument('--cluster-health-disable', action='store_true',
                         help='disable cluster health monitoring.')
     parser.add_argument('--cluster-health-timeout', type=float, default=10.0,
@@ -323,7 +343,8 @@ def main():
     parser.add_argument('--nodes-stats-timeout', type=float, default=10.0,
                         help='request timeout for nodes stats monitoring, in seconds. (default: 10)')
     parser.add_argument('--nodes-stats-metrics', type=nodes_stats_metrics_parser,
-                        help='limit nodes stats to specific metrics. Metrics should be separated by commas e.g. indices,fs.')
+                        help='limit nodes stats to specific metrics. '
+                             'Metrics should be separated by commas e.g. indices,fs.')
     parser.add_argument('--indices-stats-disable', action='store_true',
                         help='disable indices stats monitoring.')
     parser.add_argument('--indices-stats-timeout', type=float, default=10.0,
@@ -331,9 +352,12 @@ def main():
     parser.add_argument('--indices-stats-mode', default='cluster', choices=['cluster', 'indices'],
                         help='detail mode for indices stats monitoring. (default: cluster)')
     parser.add_argument('--indices-stats-metrics', type=indices_stats_metrics_parser,
-                        help='limit indices stats to specific metrics. Metrics should be separated by commas e.g. indices,fs.')
+                        help='limit indices stats to specific metrics. '
+                             'Metrics should be separated by commas e.g. indices,fs.')
     parser.add_argument('--indices-stats-fields', type=indices_stats_fields_parser,
-                        help='include fielddata info for specific fields. Fields should be separated by commas e.g. indices,fs. Use \'*\' for all.')
+                        help='include fielddata info for specific fields. '
+                             'Fields should be separated by commas e.g. indices,fs. '
+                             'Use \'*\' for all.')
     parser.add_argument('-j', '--json-logging', action='store_true',
                         help='turn on json logging.')
     parser.add_argument('--log-level', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
