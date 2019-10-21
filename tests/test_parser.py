@@ -42,6 +42,41 @@ class Test(unittest.TestCase):
         result = convert_result(parse_response(response))
         self.assertEqual(expected, result)
 
+    # ES7 changed the format of hits.total - this tests parsing the new format
+    def test_query_es7(self):
+        # Query:
+        # {
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
+        #     }
+        # }
+        response = {
+            "_shards": {
+                "failed": 0,
+                "skipped": 0,
+                "successful": 1,
+                "total": 1
+            },
+            "hits": {
+                "hits": [],
+                "max_score": None,
+                "total": {
+                    "relation": "eq",
+                    "value": 3
+                }
+            },
+            "timed_out": False,
+            "took": 3
+        }
+
+        expected = {
+            'hits': 3,
+            'took_milliseconds': 3
+        }
+        result = convert_result(parse_response(response))
+        self.assertEqual(expected, result)
+
     # effectively tests other singe-value metrics: max,min,sum,cardinality
     def test_avg(self):
         # Query:
@@ -247,6 +282,80 @@ class Test(unittest.TestCase):
             'val_extended_stats_sum_of_squares': 14.0,
             'val_extended_stats_variance': 0.6666666666666666
 
+        }
+        result = convert_result(parse_response(response))
+        self.assertEqual(expected, result)
+
+    # Sample response uses extra document in ES instance:
+    # > http -v POST localhost:9200/foo/bar/4 dateval='2019-01-01T00:00:00Z'
+    def test_datefield_extended_stats(self):
+        # Query:
+        # {
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
+        #     },
+        #     "aggs": {
+        #         "val_extended_stats": {
+        #             "extended_stats": {"field": "dateval"}
+        #         }
+        #     }
+        # }
+        response = {
+            "_shards": {
+                "failed": 0,
+                "successful": 5,
+                "total": 5
+            },
+            "aggregations": {
+                "val_extended_stats": {
+                    "avg": 1546300800000,
+                    "avg_as_string": "2019-01-01T00:00:00.000Z",
+                    "count": 1,
+                    "max": 1546300800000,
+                    "max_as_string": "2019-01-01T00:00:00.000Z",
+                    "min": 1546300800000,
+                    "min_as_string": "2019-01-01T00:00:00.000Z",
+                    "std_deviation": 0,
+                    "std_deviation_as_string": "1970-01-01T00:00:00.000Z",
+                    "std_deviation_bounds": {
+                        "upper": 1546300800000,
+                        "lower": 1546300800000
+                    },
+                    "std_deviation_bounds_as_string": {
+                        "upper": "2019-01-01T00:00:00.000Z",
+                        "lower": "2019-01-01T00:00:00.000Z"
+                    },
+                    "sum": 1546300800000,
+                    "sum_as_string": "2019-01-01T00:00:00.000Z",
+                    "sum_of_squares": 2.39104616408064e+24,
+                    "sum_of_squares_as_string": "292278994-08-17T07:12:55.807Z",
+                    "variance": 0,
+                    "variance_as_string": "1970-01-01T00:00:00.000Z"
+                }
+            },
+            "hits": {
+                "hits": [],
+                "max_score": 0.0,
+                "total": 4
+            },
+            "timed_out": False,
+            "took": 1
+        }
+
+        expected = {
+            'hits': 4,
+            'took_milliseconds': 1,
+            'val_extended_stats_avg': 1546300800000,
+            'val_extended_stats_count': 1,
+            'val_extended_stats_max': 1546300800000,
+            'val_extended_stats_min': 1546300800000,
+            'val_extended_stats_sum': 1546300800000,
+            'val_extended_stats_std_deviation': 0,
+            'val_extended_stats_std_deviation_bounds_upper': 1546300800000,
+            'val_extended_stats_std_deviation_bounds_lower': 1546300800000,
+            'val_extended_stats_sum_of_squares': 2.39104616408064e+24,
+            'val_extended_stats_variance': 0
         }
         result = convert_result(parse_response(response))
         self.assertEqual(expected, result)

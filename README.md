@@ -7,7 +7,18 @@ The exporter periodically runs configured queries against the Elasticsearch clus
 
 Values are parsed out of the Elasticsearch results automatically, with the path through the JSON to the value being used to construct metric names.
 
-Metrics are only extracted from aggregation results, with the exception of the query `hits.total` count (exposed as `hits`) and `took` time (exposed as `took_milliseconds`). The keys of any buckets are converted to labels, rather than being inserted into the metric name. See [tests/test_parser.py](tests/test_parser.py) for all the supported queries/metrics.
+Metrics are only extracted from aggregation results, with the exception of the query `hits.total` count (exposed as `hits`) and `took` time (exposed as `took_milliseconds`). The keys of any buckets are converted to labels, rather than being inserted into the metric name.
+
+### Supported Aggregations
+A limited set of aggregations are explicitly supported with tests. See [tests/test_parser.py](tests/test_parser.py) for example queries using these aggregations, and the metrics they produce. Most other aggregations should also work, so long as their result format is similar in structure to one of the explicitly supported aggregations.
+
+If you would like to use a particular aggregation but it is not working correctly (and it isn't explicitly unsupported), please raise an issue or PR.
+
+### Unsupported Aggregations
+Some aggregations are explicitly unsupported - they don't work correctly, and this can't/won't be fixed for some reason.
+
+#### `top_hits`
+The `top_hits` aggregation returns documents, not metrics about documents. Extracting metrics from arbitrary documents is out of scope for this exporter due to the complexities involved.
 
 ## Cluster Metrics
 The exporter queries the Elasticsearch cluster's `_cluster/health`, `_nodes/stats`, and `_stats` endpoints whenever its metrics endpoint is called, and exports the results as Prometheus gauge metrics.

@@ -1,7 +1,9 @@
 import argparse
 import configparser
+import glob
 import json
 import logging
+import os
 import re
 import sched
 import signal
@@ -308,7 +310,8 @@ def main():
                         help='disable query monitoring. Config file does not need to be present if query monitoring is disabled.')
     parser.add_argument('-c', '--config-file', default='exporter.cfg',
                         help='path to query config file. Can be absolute, or relative to the current working directory. (default: exporter.cfg)')
-
+    parser.add_argument('--config-dir', default='./config',
+                        help='path to query config directory. Besides including the single config file specified by "--config-file" at first, all config files in the config directory will be sorted, merged, then included. Can be absolute, or relative to the current working directory. (default: ./config)')
     parser.add_argument('--cluster-health-disable', action='store_true',
                         help='disable cluster health monitoring.')
     parser.add_argument('--cluster-health-timeout', type=float, default=10.0,
@@ -339,7 +342,6 @@ def main():
                         help='turn on verbose (DEBUG) logging. Overrides --log-level.')
     args = parser.parse_args()
 
-
     if args.basic_user and args.basic_password is None:
         parser.error('Username provided with no password.')
     elif args.basic_user is None and args.basic_password:
@@ -360,6 +362,7 @@ def main():
         level=logging.DEBUG if args.verbose else log_level
     )
     logging.captureWarnings(True)
+
     port = args.port
     es_cluster = args.es_cluster.split(',')
 
@@ -383,6 +386,10 @@ def main():
 
         config = configparser.ConfigParser()
         config.read_file(open(args.config_file))
+
+        config_dir_file_pattern = os.path.join(args.config_dir, '*.cfg')
+        config_dir_sorted_files = sorted(glob.glob(config_dir_file_pattern))
+        config.read(config_dir_sorted_files)
 
         query_prefix = 'query_'
         queries = {}
