@@ -373,18 +373,17 @@ def main():
     port = args.port
     es_cluster = args.es_cluster.split(',')
 
-    if args.client_cert and args.client_key and args.ca_certs:
+    if args.ca_certs:
         es_client = Elasticsearch(es_cluster,
                                   verify_certs=True,
-                                  scheme="https",
                                   ca_certs=args.ca_certs,
-                                  client_cert=args.client_cert ,
+                                  client_cert=args.client_cert,
                                   client_key=args.client_key,
                                   http_auth=http_auth)
-    elif args.ca_certs:
-        es_client = Elasticsearch(es_cluster, verify_certs=True, ca_certs=args.ca_certs, http_auth=http_auth)
     else:
-        es_client = Elasticsearch(es_cluster, verify_certs=False, http_auth=http_auth)
+        es_client = Elasticsearch(es_cluster,
+                                  verify_certs=False,
+                                  http_auth=http_auth)
 
     scheduler = None
 
