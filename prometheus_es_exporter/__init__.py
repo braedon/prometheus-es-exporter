@@ -3,6 +3,7 @@ import configparser
 import glob
 import json
 import logging
+import os
 import re
 import sched
 import signal
@@ -374,7 +375,8 @@ def main():
         config = configparser.ConfigParser()
         config.read_file(open(args.config_file))
 
-        config_dir_sorted_files = sorted(glob.glob(os.path.join(args.config_dir, '*.cfg')))
+        config_dir_file_pattern = os.path.join(args.config_dir, '*.cfg')
+        config_dir_sorted_files = sorted(glob.glob(config_dir_file_pattern))
         config.read(config_dir_sorted_files)
 
         query_prefix = 'query_'
