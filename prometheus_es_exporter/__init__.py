@@ -351,6 +351,13 @@ def main():
     else:
         http_auth = None
 
+    if not args.ca_certs and (args.client_cert or args.client_key):
+        parser.error('--client-cert and --client-key can only be used when --ca-certs is provided.')
+    elif args.client_cert and not args.client_key:
+        parser.error('--client-key must be provided when --client-cert is used.')
+    elif not args.client_cert and args.client_key:
+        parser.error('--client-cert must be provided when --client-key is used.')
+
     log_handler = logging.StreamHandler()
     log_format = '[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s'
     formatter = JogFormatter(log_format) if args.json_logging else logging.Formatter(log_format)
