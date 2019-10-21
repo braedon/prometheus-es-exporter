@@ -294,12 +294,12 @@ def main():
     parser = argparse.ArgumentParser(description='Export ES query results to Prometheus.')
     parser.add_argument('-e', '--es-cluster', default='localhost',
                         help='addresses of nodes in a Elasticsearch cluster to run queries on. Nodes should be separated by commas e.g. es1,es2. Ports can be provided if non-standard (9200) e.g. es1:9999 (default: localhost)')
-    parser.add_argument('--client-cert',
-                        help='Certificate for authentication. (default: no cert)')
-    parser.add_argument('--client-key',
-                        help='Key for authentication. (default: no key)')
     parser.add_argument('--ca-certs',
                         help='path to a CA certificate bundle. Can be absolute, or relative to the current working directory. If not specified, SSL certificate verification is disabled.')
+    parser.add_argument('--client-cert',
+                        help='path to a SSL client certificate. Can be absolute, or relative to the current working directory. If not specified, SSL client authentication is disabled.')
+    parser.add_argument('--client-key',
+                        help='path to a SSL client key. Can be absolute, or relative to the current working directory. Must be specified if "--client-cert" is provided.')
     parser.add_argument('-p', '--port', type=int, default=9206,
                         help='port to serve the metrics endpoint on. (default: 9206)')
     parser.add_argument('--basic-user',
