@@ -72,6 +72,13 @@ def group_metrics(metrics):
 def update_gauges(metrics):
     metric_dict = group_metrics(metrics)
 
+    query_prefix = metrics[0][0][0]
+    query_metric_names = set()
+    query_metrics_found = set()
+    for metric_name in gauges.keys():
+        if metric_name.startswith(query_prefix):
+            query_metric_names.add(metric_name)
+
     for metric_name, (label_keys, value_dict) in metric_dict.items():
         if metric_name in gauges:
             (old_label_values_set, gauge) = gauges[metric_name]
@@ -90,8 +97,14 @@ def update_gauges(metrics):
             else:
                 gauge.set(value)
 
+        query_metrics_found.add(metric_name)
         gauges[metric_name] = (new_label_values_set, gauge)
 
+    query_metrics_empty = query_metric_names - query_metrics_found
+    for metric_name in query_metrics_empty:
+        gauge = gauges[metric_name][1]
+        REGISTRY.unregister(gauge)
+        del gauges[metric_name]
 
 def gauge_generator(metrics):
     metric_dict = group_metrics(metrics)
