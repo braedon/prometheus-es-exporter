@@ -4,7 +4,7 @@ setup(
     name='prometheus-es-exporter',
     version='0.7.0.dev1',
     description='Elasticsearch query Prometheus exporter',
-    url='https://github.com/Braedon/prometheus-es-exporter',
+    url='https://github.com/braedon/prometheus-es-exporter',
     author='Braedon Vickers',
     author_email='braedon.vickers@gmail.com',
     license='MIT',
@@ -18,13 +18,14 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
     keywords='monitoring prometheus exporter elasticsearch',
     packages=find_packages(exclude=['tests']),
     install_requires=[
         'elasticsearch',
         'jog',
-        'prometheus-client'
+        'prometheus-client >= 0.6.0',
     ],
     entry_points={
         'console_scripts': [

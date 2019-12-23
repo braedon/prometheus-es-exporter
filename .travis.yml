@@ -1,12 +1,15 @@
 language: python
+sudo: required
+dist: xenial
 python:
   - "3.4"
   - "3.5"
   - "3.6"
+  - "3.7"
 script:
   - python setup.py test
 after_success:
-  - if [[ $TRAVIS_PYTHON_VERSION == 3.6* ]]; then export RELEASE_SENTINEL=1; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.7* ]]; then export RELEASE_SENTINEL=1; fi
 deploy:
   provider: pypi
   user: $PYPI_USERNAME
