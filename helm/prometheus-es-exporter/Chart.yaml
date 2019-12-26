@@ -1,0 +1,9 @@
+apiVersion: v1
+description: Launch queries to elasticsearch and renderize them as prometheus metrics.
+name: prometheus-es-exporter
+version: 0.0.1
+appVersion: "1.0"
+home: https://github.com/braedon/prometheus-es-exporter
+maintainers:
+  - name: Alex Perez-Pujol
+    email: alexperezpujol@disroot.org
