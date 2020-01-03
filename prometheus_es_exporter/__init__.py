@@ -6,8 +6,6 @@ import logging
 import os
 import re
 import sched
-import signal
-import sys
 import time
 
 from collections import OrderedDict
@@ -22,6 +20,8 @@ from prometheus_es_exporter import cluster_health_parser
 from prometheus_es_exporter import indices_stats_parser
 from prometheus_es_exporter import nodes_stats_parser
 from prometheus_es_exporter.parser import parse_response
+from prometheus_es_exporter.utils import log_exceptions, nice_shutdown
+
 
 CONTEXT_SETTINGS = {
     'help_option_names': ['-h', '--help']
@@ -238,15 +238,6 @@ def run_scheduler(scheduler, interval, func):
     )
 
 
-def shutdown():
-    logging.info('Shutting down')
-    sys.exit(1)
-
-
-def signal_handler(signum, frame):
-    shutdown()
-
-
 # Based on click.Choice
 class MultiChoice(click.ParamType):
     """The choice type allows a value to be checked against a fixed set
@@ -435,8 +426,6 @@ def indices_stats_fields_parser(ctx, param, value):
 def cli(**options):
     """Export Elasticsearch query results to Prometheus."""
 
-    signal.signal(signal.SIGTERM, signal_handler)
-
     if options['basic_user'] and options['basic_password'] is None:
         click.BadOptionUsage('basic_user', 'Username provided with no password.')
     elif options['basic_user'] is None and options['basic_password']:
@@ -535,17 +524,14 @@ def cli(**options):
     start_http_server(port)
     logging.info('Server started on port %s', port)
 
-    try:
-        if scheduler:
-            scheduler.run()
-        else:
-            while True:
-                time.sleep(5)
-    except KeyboardInterrupt:
-        pass
-
-    shutdown()
+    if scheduler:
+        scheduler.run()
+    else:
+        while True:
+            time.sleep(5)
 
 
+@log_exceptions(exit_on_exception=True)
+@nice_shutdown()
 def main():
     cli(auto_envvar_prefix='ES_EXPORTER')
