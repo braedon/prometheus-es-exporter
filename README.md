@@ -45,6 +45,9 @@ By default, it will bind to port 9206, query Elasticsearch on `localhost:9200` a
 ```
 Run with the `-h` flag to see details on all the available options.
 
+Note that all options can be set via environment variables. The environment variable names are prefixed with `ES_EXPORTER`, e.g. `ES_EXPORTER_BASIC_USER=fred` is equivalent to `--basic-user fred`. CLI options take precidence over environment variables.
+
+
 See the provided [exporter.cfg](exporter.cfg) file for query configuration examples and explanation.
 
 # Docker

@@ -1,4 +1,4 @@
-import argparse
+import click
 import configparser
 import glob
 import json
@@ -22,6 +22,10 @@ from prometheus_es_exporter import cluster_health_parser
 from prometheus_es_exporter import indices_stats_parser
 from prometheus_es_exporter import nodes_stats_parser
 from prometheus_es_exporter.parser import parse_response
+
+CONTEXT_SETTINGS = {
+    'help_option_names': ['-h', '--help']
+}
 
 gauges = {}
 
@@ -243,20 +247,80 @@ def signal_handler(signum, frame):
     shutdown()
 
 
-def csv_choice_arg_parser(choices, arg):
-    metrics = arg.split(',')
+# Based on click.Choice
+class MultiChoice(click.ParamType):
+    """The choice type allows a value to be checked against a fixed set
+    of supported values. All of these values have to be strings.
 
-    invalid_metrics = []
-    for metric in metrics:
-        if metric not in choices:
-            invalid_metrics.append(metric)
+    Multiple values can be provided, separated by commas.
 
-    if invalid_metrics:
-        msg = 'invalid metric(s): "{}" in "{}" (choose from {})' \
-            .format(','.join(invalid_metrics), arg, ','.join(choices))
-        raise argparse.ArgumentTypeError(msg)
+    You should only pass a list or tuple of choices. Other iterables
+    (like generators) may lead to surprising results.
 
-    return metrics
+    :param case_sensitive: Set to false to make choices case
+        insensitive. Defaults to true.
+    """
+
+    name = 'multi-choice'
+
+    def __init__(self, choices, case_sensitive=True):
+        self.choices = choices
+        self.case_sensitive = case_sensitive
+
+    def get_metavar(self, param):
+        return '[%s]' % '|'.join(self.choices)
+
+    def get_missing_message(self, param):
+        return 'Choose one or more from:\n\t%s.' % ',\n\t'.join(self.choices)
+
+    def convert_one(self, value, param, ctx):
+        # Exact match
+        if value in self.choices:
+            return value
+
+        # Match through normalization and case sensitivity
+        # first do token_normalize_func, then lowercase
+        # preserve original `value` to produce an accurate message in
+        # `self.fail`
+        normed_value = value
+        normed_choices = self.choices
+
+        if ctx is not None and \
+           ctx.token_normalize_func is not None:
+            normed_value = ctx.token_normalize_func(value)
+            normed_choices = [ctx.token_normalize_func(choice) for choice in
+                              self.choices]
+
+        if not self.case_sensitive:
+            normed_value = normed_value.lower()
+            normed_choices = [choice.lower() for choice in normed_choices]
+
+        if normed_value in normed_choices:
+            return normed_value
+
+        return None
+
+    def convert(self, value, param, ctx):
+        values = value.split(',')
+
+        valid_choices = []
+        invalid_values = []
+        for value in values:
+            choice = self.convert_one(value, param, ctx)
+            if choice is None:
+                invalid_values.append(value)
+            else:
+                valid_choices.append(choice)
+
+        if invalid_values:
+            msg = 'invalid choice(s): %s (choose from %s)' % \
+                (', '.join(invalid_values), ', '.join(self.choices))
+            self.fail(msg, param, ctx)
+
+        return valid_choices
+
+    def __repr__(self):
+        return 'MultiChoice(%r)' % list(self.choices)
 
 
 # https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-nodes-stats.html#_nodes_statistics
@@ -265,10 +329,7 @@ NODES_STATS_METRICS_OPTIONS = [
     'process', 'thread_pool', 'transport',
     'breaker', 'discovery', 'ingest'
 ]
-nodes_stats_metrics_parser = partial(csv_choice_arg_parser, NODES_STATS_METRICS_OPTIONS)
 
-
-'completion,docs,fielddata,flush,get,indexing,merge,query_cache,recovery,refresh,request_cache,search,segments,store,suggest,translog,warmer'
 
 # https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-nodes-stats.html#node-indices-stats
 INDICES_STATS_METRICS_OPTIONS = [
@@ -278,131 +339,143 @@ INDICES_STATS_METRICS_OPTIONS = [
     'request_cache', 'search', 'segments',
     'store', 'suggest', 'translog', 'warmer'
 ]
-indices_stats_metrics_parser = partial(csv_choice_arg_parser, INDICES_STATS_METRICS_OPTIONS)
 
 
-def indices_stats_fields_parser(arg):
-    if arg == '*':
-        return arg
+def indices_stats_fields_parser(ctx, param, value):
+    if value is None:
+        return None
+
+    if value == '*':
+        return value
     else:
-        return arg.split(',')
+        return value.split(',')
 
 
-def main():
+@click.command(context_settings=CONTEXT_SETTINGS)
+@click.option('--es-cluster', '-e', default='localhost',
+              help='Addresses of nodes in a Elasticsearch cluster to run queries on. '
+                   'Nodes should be separated by commas e.g. es1,es2. '
+                   'Ports can be provided if non-standard (9200) e.g. es1:9999. '
+                   'Include the scheme for non-http nodes e.g. https://es1:9200. '
+                   '--ca-certs must be provided for SSL certificate verification. '
+                   '(default: localhost)')
+@click.option('--ca-certs',
+              help='Path to a CA certificate bundle. '
+                   'Can be absolute, or relative to the current working directory. '
+                   'If not specified, SSL certificate verification is disabled.')
+@click.option('--client-cert',
+              help='Path to a SSL client certificate. '
+                   'Can be absolute, or relative to the current working directory. '
+                   'If not specified, SSL client authentication is disabled.')
+@click.option('--client-key',
+              help='Path to a SSL client key. '
+                   'Can be absolute, or relative to the current working directory. '
+                   'Must be specified if "--client-cert" is provided.')
+@click.option('--basic-user',
+              help='Username for basic authentication with nodes. '
+                   'If not specified, basic authentication is disabled.')
+@click.option('--basic-password',
+              help='Password for basic authentication with nodes. '
+                   'Must be specified if "--basic-user" is provided.')
+@click.option('--port', '-p', default=9206,
+              help='Port to serve the metrics endpoint on. (default: 9206)')
+@click.option('--query-disable', default=False, is_flag=True,
+              help='Disable query monitoring. '
+                   'Config file does not need to be present if query monitoring is disabled.')
+@click.option('--config-file', '-c', default='exporter.cfg', type=click.File(),
+              help='Path to query config file. '
+                   'Can be absolute, or relative to the current working directory. '
+                   '(default: exporter.cfg)')
+@click.option('--config-dir', default='./config', type=click.Path(file_okay=False),
+              help='Path to query config directory. '
+                   'If present, any files ending in ".cfg" in the directory '
+                   'will be parsed as additional query config files. '
+                   'Merge order is main config file, then config directory files '
+                   'in filename order. '
+                   'Can be absolute, or relative to the current working directory. '
+                   '(default: ./config)')
+@click.option('--cluster-health-disable', default=False, is_flag=True,
+              help='Disable cluster health monitoring.')
+@click.option('--cluster-health-timeout', default=10.0,
+              help='Request timeout for cluster health monitoring, in seconds. (default: 10)')
+@click.option('--cluster-health-level', default='indices',
+              type=click.Choice(['cluster', 'indices', 'shards']),
+              help='Level of detail for cluster health monitoring.  (default: indices)')
+@click.option('--nodes-stats-disable', default=False, is_flag=True,
+              help='Disable nodes stats monitoring.')
+@click.option('--nodes-stats-timeout', default=10.0,
+              help='Request timeout for nodes stats monitoring, in seconds. (default: 10)')
+@click.option('--nodes-stats-metrics',
+              type=MultiChoice(NODES_STATS_METRICS_OPTIONS),
+              help='Limit nodes stats to specific metrics. '
+                   'Metrics should be separated by commas e.g. indices,fs.')
+@click.option('--indices-stats-disable', default=False, is_flag=True,
+              help='Disable indices stats monitoring.')
+@click.option('--indices-stats-timeout', default=10.0,
+              help='Request timeout for indices stats monitoring, in seconds. (default: 10)')
+@click.option('--indices-stats-mode', default='cluster',
+              type=click.Choice(['cluster', 'indices']),
+              help='Detail mode for indices stats monitoring. (default: cluster)')
+@click.option('--indices-stats-metrics',
+              type=MultiChoice(INDICES_STATS_METRICS_OPTIONS),
+              help='Limit indices stats to specific metrics. '
+                   'Metrics should be separated by commas e.g. indices,fs.')
+@click.option('--indices-stats-fields',
+              callback=indices_stats_fields_parser,
+              help='Include fielddata info for specific fields. '
+                   'Fields should be separated by commas e.g. indices,fs. '
+                   'Use \'*\' for all.')
+@click.option('--json-logging', '-j', default=False, is_flag=True,
+              help='Turn on json logging.')
+@click.option('--log-level', default='INFO',
+              type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']),
+              help='Detail level to log. (default: INFO)')
+@click.option('--verbose', '-v', default=False, is_flag=True,
+              help='Turn on verbose (DEBUG) logging. Overrides --log-level.')
+def cli(**options):
+    """Export Elasticsearch query results to Prometheus."""
+
     signal.signal(signal.SIGTERM, signal_handler)
 
-    parser = argparse.ArgumentParser(description='Export ES query results to Prometheus.')
-    parser.add_argument('-e', '--es-cluster', default='localhost',
-                        help='addresses of nodes in a Elasticsearch cluster to run queries on. '
-                             'Nodes should be separated by commas e.g. es1,es2. '
-                             'Ports can be provided if non-standard (9200) e.g. es1:9999. '
-                             'Include the scheme for non-http nodes e.g. https://es1:9200. '
-                             '--ca-certs must be provided for SSL certificate verification. '
-                             '(default: localhost)')
-    parser.add_argument('--ca-certs',
-                        help='path to a CA certificate bundle. '
-                             'Can be absolute, or relative to the current working directory. '
-                             'If not specified, SSL certificate verification is disabled.')
-    parser.add_argument('--client-cert',
-                        help='path to a SSL client certificate. '
-                             'Can be absolute, or relative to the current working directory. '
-                             'If not specified, SSL client authentication is disabled.')
-    parser.add_argument('--client-key',
-                        help='path to a SSL client key. '
-                             'Can be absolute, or relative to the current working directory. '
-                             'Must be specified if "--client-cert" is provided.')
-    parser.add_argument('--basic-user',
-                        help='username for basic authentication with nodes. '
-                             'If not specified, basic authentication is disabled.')
-    parser.add_argument('--basic-password',
-                        help='password for basic authentication with nodes. '
-                             'Must be specified if "--basic-user" is provided.')
-    parser.add_argument('-p', '--port', type=int, default=9206,
-                        help='port to serve the metrics endpoint on. (default: 9206)')
-    parser.add_argument('--query-disable', action='store_true',
-                        help='disable query monitoring. '
-                             'Config file does not need to be present if query monitoring is disabled.')
-    parser.add_argument('-c', '--config-file', default='exporter.cfg',
-                        help='path to query config file. '
-                             'Can be absolute, or relative to the current working directory. '
-                             '(default: exporter.cfg)')
-    parser.add_argument('--config-dir', default='./config',
-                        help='path to query config directory. '
-                             'Besides including the single config file specified by "--config-file" at first, '
-                             'all config files in the config directory will be sorted, merged, then included. '
-                             'Can be absolute, or relative to the current working directory. '
-                             '(default: ./config)')
-    parser.add_argument('--cluster-health-disable', action='store_true',
-                        help='disable cluster health monitoring.')
-    parser.add_argument('--cluster-health-timeout', type=float, default=10.0,
-                        help='request timeout for cluster health monitoring, in seconds. (default: 10)')
-    parser.add_argument('--cluster-health-level', default='indices', choices=['cluster', 'indices', 'shards'],
-                        help='level of detail for cluster health monitoring.  (default: indices)')
-    parser.add_argument('--nodes-stats-disable', action='store_true',
-                        help='disable nodes stats monitoring.')
-    parser.add_argument('--nodes-stats-timeout', type=float, default=10.0,
-                        help='request timeout for nodes stats monitoring, in seconds. (default: 10)')
-    parser.add_argument('--nodes-stats-metrics', type=nodes_stats_metrics_parser,
-                        help='limit nodes stats to specific metrics. '
-                             'Metrics should be separated by commas e.g. indices,fs.')
-    parser.add_argument('--indices-stats-disable', action='store_true',
-                        help='disable indices stats monitoring.')
-    parser.add_argument('--indices-stats-timeout', type=float, default=10.0,
-                        help='request timeout for indices stats monitoring, in seconds. (default: 10)')
-    parser.add_argument('--indices-stats-mode', default='cluster', choices=['cluster', 'indices'],
-                        help='detail mode for indices stats monitoring. (default: cluster)')
-    parser.add_argument('--indices-stats-metrics', type=indices_stats_metrics_parser,
-                        help='limit indices stats to specific metrics. '
-                             'Metrics should be separated by commas e.g. indices,fs.')
-    parser.add_argument('--indices-stats-fields', type=indices_stats_fields_parser,
-                        help='include fielddata info for specific fields. '
-                             'Fields should be separated by commas e.g. indices,fs. '
-                             'Use \'*\' for all.')
-    parser.add_argument('-j', '--json-logging', action='store_true',
-                        help='turn on json logging.')
-    parser.add_argument('--log-level', default='INFO', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-                        help='detail level to log. (default: INFO)')
-    parser.add_argument('-v', '--verbose', action='store_true',
-                        help='turn on verbose (DEBUG) logging. Overrides --log-level.')
-    args = parser.parse_args()
-
-    if args.basic_user and args.basic_password is None:
-        parser.error('Username provided with no password.')
-    elif args.basic_user is None and args.basic_password:
-        parser.error('Password provided with no username.')
-    elif args.basic_user:
-        http_auth = (args.basic_user, args.basic_password)
+    if options['basic_user'] and options['basic_password'] is None:
+        click.BadOptionUsage('basic_user', 'Username provided with no password.')
+    elif options['basic_user'] is None and options['basic_password']:
+        click.BadOptionUsage('basic_password', 'Password provided with no username.')
+    elif options['basic_user']:
+        http_auth = (options['basic_user'], options['basic_password'])
     else:
         http_auth = None
 
-    if not args.ca_certs and (args.client_cert or args.client_key):
-        parser.error('--client-cert and --client-key can only be used when --ca-certs is provided.')
-    elif args.client_cert and not args.client_key:
-        parser.error('--client-key must be provided when --client-cert is used.')
-    elif not args.client_cert and args.client_key:
-        parser.error('--client-cert must be provided when --client-key is used.')
+    if not options['ca_certs'] and options['client_cert']:
+        click.BadOptionUsage('client_cert', '--client-cert can only be used when --ca-certs is provided.')
+    elif not options['ca_certs'] and options['client_key']:
+        click.BadOptionUsage('client_key', '--client-key can only be used when --ca-certs is provided.')
+    elif options['client_cert'] and not options['client_key']:
+        click.BadOptionUsage('client_cert', '--client-key must be provided when --client-cert is used.')
+    elif not options['client_cert'] and options['client_key']:
+        click.BadOptionUsage('client_key', '--client-cert must be provided when --client-key is used.')
 
     log_handler = logging.StreamHandler()
     log_format = '[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s'
-    formatter = JogFormatter(log_format) if args.json_logging else logging.Formatter(log_format)
+    formatter = JogFormatter(log_format) if options['json_logging'] else logging.Formatter(log_format)
     log_handler.setFormatter(formatter)
 
-    log_level = getattr(logging, args.log_level)
+    log_level = getattr(logging, options['log_level'])
     logging.basicConfig(
         handlers=[log_handler],
-        level=logging.DEBUG if args.verbose else log_level
+        level=logging.DEBUG if options['verbose'] else log_level
     )
     logging.captureWarnings(True)
 
-    port = args.port
-    es_cluster = args.es_cluster.split(',')
+    port = options['port']
+    es_cluster = options['es_cluster'].split(',')
 
-    if args.ca_certs:
+    if options['ca_certs']:
         es_client = Elasticsearch(es_cluster,
                                   verify_certs=True,
-                                  ca_certs=args.ca_certs,
-                                  client_cert=args.client_cert,
-                                  client_key=args.client_key,
+                                  ca_certs=options['ca_certs'],
+                                  client_cert=options['client_cert'],
+                                  client_key=options['client_key'],
                                   http_auth=http_auth)
     else:
         es_client = Elasticsearch(es_cluster,
@@ -411,13 +484,13 @@ def main():
 
     scheduler = None
 
-    if not args.query_disable:
+    if not options['query_disable']:
         scheduler = sched.scheduler()
 
         config = configparser.ConfigParser()
-        config.read_file(open(args.config_file))
+        config.read_file(options['config_file'])
 
-        config_dir_file_pattern = os.path.join(args.config_dir, '*.cfg')
+        config_dir_file_pattern = os.path.join(options['config_dir'], '*.cfg')
         config_dir_sorted_files = sorted(glob.glob(config_dir_file_pattern))
         config.read(config_dir_sorted_files)
 
@@ -438,25 +511,25 @@ def main():
                 func = partial(run_query, es_client, name, indices, query, timeout)
                 run_scheduler(scheduler, interval, func)
         else:
-            logging.warn('No queries found in config file %s', args.config_file)
+            logging.warn('No queries found in config file %s', options['config_file'])
 
-    if not args.cluster_health_disable:
+    if not options['cluster_health_disable']:
         REGISTRY.register(ClusterHealthCollector(es_client,
-                                                 args.cluster_health_timeout,
-                                                 args.cluster_health_level))
+                                                 options['cluster_health_timeout'],
+                                                 options['cluster_health_level']))
 
-    if not args.nodes_stats_disable:
+    if not options['nodes_stats_disable']:
         REGISTRY.register(NodesStatsCollector(es_client,
-                                              args.nodes_stats_timeout,
-                                              metrics=args.nodes_stats_metrics))
+                                              options['nodes_stats_timeout'],
+                                              metrics=options['nodes_stats_metrics']))
 
-    if not args.indices_stats_disable:
-        parse_indices = args.indices_stats_mode == 'indices'
+    if not options['indices_stats_disable']:
+        parse_indices = options['indices_stats_mode'] == 'indices'
         REGISTRY.register(IndicesStatsCollector(es_client,
-                                                args.indices_stats_timeout,
+                                                options['indices_stats_timeout'],
                                                 parse_indices=parse_indices,
-                                                metrics=args.indices_stats_metrics,
-                                                fields=args.indices_stats_fields))
+                                                metrics=options['indices_stats_metrics'],
+                                                fields=options['indices_stats_fields']))
 
     logging.info('Starting server...')
     start_http_server(port)
@@ -472,3 +545,7 @@ def main():
         pass
 
     shutdown()
+
+
+def main():
+    cli(auto_envvar_prefix='ES_EXPORTER')
