@@ -1,5 +1,7 @@
 from collections import OrderedDict
 
+from .metrics import format_metric_name, format_labels
+
 
 def parse_buckets(agg_key, buckets, metric=None, labels=None):
     if metric is None:
@@ -71,7 +73,7 @@ def parse_agg(agg_key, agg, metric=None, labels=None):
         # Anything else (with the exception of sub-objects,
         # which are handled above) is ignored.
         elif isinstance(value, (int, float)):
-            result.append((metric + [key], labels, value))
+            result.append((metric + [key], '', labels, value))
 
     return result
 
@@ -80,7 +82,7 @@ def parse_response(response, metric=None):
     if metric is None:
         metric = []
 
-    result = []
+    metrics = []
 
     if not response['timed_out']:
         total = response['hits']['total']
@@ -88,11 +90,18 @@ def parse_response(response, metric=None):
         # a dict with a 'value' key.
         if isinstance(total, dict):
             total = total['value']
-        result.append((metric + ['hits'], {}, total))
-        result.append((metric + ['took', 'milliseconds'], {}, response['took']))
+        metrics.append((metric + ['hits'], '', {}, total))
+        metrics.append((metric + ['took', 'milliseconds'], '', {}, response['took']))
 
         if 'aggregations' in response.keys():
             for key, value in response['aggregations'].items():
-                result.extend(parse_agg(key, value, metric=metric + [key]))
+                metrics.extend(parse_agg(key, value, metric=metric + [key]))
 
-    return result
+    return [
+        (format_metric_name(*metric_name),
+         metric_doc,
+         format_labels(label_dict),
+         value)
+        for metric_name, metric_doc, label_dict, value
+        in metrics
+    ]

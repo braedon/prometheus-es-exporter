@@ -1,4 +1,4 @@
-from prometheus_es_exporter import group_metrics
+from prometheus_es_exporter.metrics import group_metrics
 
 
 def format_label(key, value):
@@ -31,6 +31,6 @@ def convert_result(result):
     metric_dict = group_metrics(result)
     return {
         metric: value
-        for metric_name, (label_keys, value_dict) in metric_dict.items()
+        for metric_name, (metric_doc, label_keys, value_dict) in metric_dict.items()
         for metric, value in format_metrics(metric_name, label_keys, value_dict).items()
     }

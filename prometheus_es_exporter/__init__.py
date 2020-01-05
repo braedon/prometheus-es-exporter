@@ -4,131 +4,55 @@ import glob
 import json
 import logging
 import os
-import re
 import sched
 import time
 
-from collections import OrderedDict
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConnectionTimeout
 from functools import partial
 from jog import JogFormatter
-from prometheus_client import start_http_server, Gauge
+from prometheus_client import start_http_server
 from prometheus_client.core import GaugeMetricFamily, REGISTRY
 
-from prometheus_es_exporter import cluster_health_parser
-from prometheus_es_exporter import indices_stats_parser
-from prometheus_es_exporter import nodes_stats_parser
-from prometheus_es_exporter.parser import parse_response
-from prometheus_es_exporter.utils import log_exceptions, nice_shutdown
+from . import cluster_health_parser
+from . import indices_stats_parser
+from . import nodes_stats_parser
+from .metrics import gauge_generator, format_metric_name
+from .parser import parse_response
+from .utils import log_exceptions, nice_shutdown
 
 
 CONTEXT_SETTINGS = {
     'help_option_names': ['-h', '--help']
 }
 
-gauges = {}
-
-metric_invalid_chars = re.compile(r'[^a-zA-Z0-9_:]')
-metric_invalid_start_chars = re.compile(r'^[^a-zA-Z_:]')
-label_invalid_chars = re.compile(r'[^a-zA-Z0-9_]')
-label_invalid_start_chars = re.compile(r'^[^a-zA-Z_]')
-label_start_double_under = re.compile(r'^__+')
+METRICS_BY_QUERY = {}
 
 
-def format_label_key(label_key):
-    label_key = re.sub(label_invalid_chars, '_', label_key)
-    label_key = re.sub(label_invalid_start_chars, '_', label_key)
-    label_key = re.sub(label_start_double_under, '_', label_key)
-    return label_key
+class QueryMetricCollector(object):
 
-
-def format_label_value(value_list):
-    return '_'.join(value_list)
-
-
-def format_metric_name(name_list):
-    metric = '_'.join(name_list)
-    metric = re.sub(metric_invalid_chars, '_', metric)
-    metric = re.sub(metric_invalid_start_chars, '_', metric)
-    return metric
-
-
-def group_metrics(metrics):
-    metric_dict = {}
-    for (name_list, label_dict, value) in metrics:
-        metric_name = format_metric_name(name_list)
-        label_dict = OrderedDict([(format_label_key(k), format_label_value(v))
-                                  for k, v in label_dict.items()])
-
-        if metric_name not in metric_dict:
-            metric_dict[metric_name] = (tuple(label_dict.keys()), {})
-
-        label_keys = metric_dict[metric_name][0]
-        label_values = tuple([label_dict[key]
-                              for key in label_keys])
-
-        metric_dict[metric_name][1][label_values] = value
-
-    return metric_dict
-
-
-def update_gauges(metrics):
-    metric_dict = group_metrics(metrics)
-
-    for metric_name, (label_keys, value_dict) in metric_dict.items():
-        if metric_name in gauges:
-            (old_label_values_set, gauge) = gauges[metric_name]
-        else:
-            old_label_values_set = set()
-            gauge = Gauge(metric_name, '', label_keys)
-
-        new_label_values_set = set(value_dict.keys())
-
-        for label_values in old_label_values_set - new_label_values_set:
-            gauge.remove(*label_values)
-
-        for label_values, value in value_dict.items():
-            if label_values:
-                gauge.labels(*label_values).set(value)
-            else:
-                gauge.set(value)
-
-        gauges[metric_name] = (new_label_values_set, gauge)
-
-
-def gauge_generator(metrics):
-    metric_dict = group_metrics(metrics)
-
-    for metric_name, (label_keys, value_dict) in metric_dict.items():
-        # If we have label keys we may have multiple different values,
-        # each with their own label values.
-        if label_keys:
-            gauge = GaugeMetricFamily(metric_name, '', labels=label_keys)
-
-            for label_values, value in value_dict.items():
-                gauge.add_metric(label_values, value)
-
-        # No label keys, so we must have only a single value.
-        else:
-            gauge = GaugeMetricFamily(metric_name, '', value=list(value_dict.values())[0])
-
-        yield gauge
+    def collect(self):
+        # Copy METRICS_BY_QUERY before iterating over it
+        # as it may be updated by other threads.
+        # (only first level - lower levels are replaced
+        # wholesale, so don't worry about them)
+        query_metrics = METRICS_BY_QUERY.copy()
+        for metrics in query_metrics.values():
+            yield from gauge_generator(metrics)
 
 
 def run_query(es_client, name, indices, query, timeout):
     try:
         response = es_client.search(index=indices, body=query, request_timeout=timeout)
 
-        metrics = parse_response(response, [name])
+        METRICS_BY_QUERY[name] = parse_response(response, [name])
+
     except Exception:
         logging.exception('Error while querying indices [%s], query [%s].', indices, query)
-    else:
-        update_gauges(metrics)
 
 
 def collector_up_gauge(name_list, description, succeeded=True):
-    metric_name = format_metric_name(name_list + ['up'])
+    metric_name = format_metric_name(*name_list, 'up')
     description = 'Did the {} fetch succeed.'.format(description)
     return GaugeMetricFamily(metric_name, description, value=int(succeeded))
 
@@ -519,6 +443,9 @@ def cli(**options):
                                                 parse_indices=parse_indices,
                                                 metrics=options['indices_stats_metrics'],
                                                 fields=options['indices_stats_fields']))
+
+    if scheduler:
+        REGISTRY.register(QueryMetricCollector())
 
     logging.info('Starting server...')
     start_http_server(port)
