@@ -1,5 +1,6 @@
 import re
 
+from collections import OrderedDict
 from prometheus_client.core import GaugeMetricFamily
 
 
@@ -43,7 +44,7 @@ def format_labels(label_dict):
     Disallowed characters in label keys and values will be replaced with
     underscores.
     """
-    formatted_label_dict = {}
+    formatted_label_dict = OrderedDict()
     for label_key, label_value in label_dict.items():
         formatted_label_key = format_label_key(label_key)
 
