@@ -9,7 +9,6 @@ import time
 
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConnectionTimeout
-from functools import partial
 from jog import JogFormatter
 from prometheus_client import start_http_server
 from prometheus_client.core import GaugeMetricFamily, REGISTRY
@@ -19,8 +18,10 @@ from . import indices_stats_parser
 from . import nodes_stats_parser
 from .metrics import gauge_generator, format_metric_name
 from .parser import parse_response
+from .scheduler import schedule_job
 from .utils import log_exceptions, nice_shutdown
 
+log = logging.getLogger(__name__)
 
 CONTEXT_SETTINGS = {
     'help_option_names': ['-h', '--help']
@@ -39,16 +40,6 @@ class QueryMetricCollector(object):
         query_metrics = METRICS_BY_QUERY.copy()
         for metrics in query_metrics.values():
             yield from gauge_generator(metrics)
-
-
-def run_query(es_client, name, indices, query, timeout):
-    try:
-        response = es_client.search(index=indices, body=query, request_timeout=timeout)
-
-        METRICS_BY_QUERY[name] = parse_response(response, [name])
-
-    except Exception:
-        logging.exception('Error while querying indices [%s], query [%s].', indices, query)
 
 
 def collector_up_gauge(name_list, description, succeeded=True):
@@ -72,10 +63,10 @@ class ClusterHealthCollector(object):
 
             metrics = cluster_health_parser.parse_response(response, self.metric_name_list)
         except ConnectionTimeout:
-            logging.warn('Timeout while fetching %s (timeout %ss).', self.description, self.timeout)
+            log.warning('Timeout while fetching %s (timeout %ss).', self.description, self.timeout)
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         except Exception:
-            logging.exception('Error while fetching %s.', self.description)
+            log.exception('Error while fetching %s.', self.description)
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         else:
             yield from gauge_generator(metrics)
@@ -97,10 +88,10 @@ class NodesStatsCollector(object):
 
             metrics = nodes_stats_parser.parse_response(response, self.metric_name_list)
         except ConnectionTimeout:
-            logging.warn('Timeout while fetching %s (timeout %ss).', self.description, self.timeout)
+            log.warning('Timeout while fetching %s (timeout %ss).', self.description, self.timeout)
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         except Exception:
-            logging.exception('Error while fetching %s.', self.description)
+            log.exception('Error while fetching %s.', self.description)
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         else:
             yield from gauge_generator(metrics)
@@ -124,42 +115,24 @@ class IndicesStatsCollector(object):
 
             metrics = indices_stats_parser.parse_response(response, self.parse_indices, self.metric_name_list)
         except ConnectionTimeout:
-            logging.warn('Timeout while fetching %s (timeout %ss).', self.description, self.timeout)
+            log.warning('Timeout while fetching %s (timeout %ss).', self.description, self.timeout)
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         except Exception:
-            logging.exception('Error while fetching %s.', self.description)
+            log.exception('Error while fetching %s.', self.description)
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         else:
             yield from gauge_generator(metrics)
             yield collector_up_gauge(self.metric_name_list, self.description)
 
 
-def run_scheduler(scheduler, interval, func):
-    def scheduled_run(scheduled_time,):
-        try:
-            func()
-        except Exception:
-            logging.exception('Error while running scheduled job.')
+def run_query(es_client, name, indices, query, timeout):
+    try:
+        response = es_client.search(index=indices, body=query, request_timeout=timeout)
 
-        current_time = time.monotonic()
-        next_scheduled_time = scheduled_time + interval
-        while next_scheduled_time < current_time:
-            next_scheduled_time += interval
+        METRICS_BY_QUERY[name] = parse_response(response, [name])
 
-        scheduler.enterabs(
-            next_scheduled_time,
-            1,
-            scheduled_run,
-            (next_scheduled_time,)
-        )
-
-    next_scheduled_time = time.monotonic()
-    scheduler.enterabs(
-        next_scheduled_time,
-        1,
-        scheduled_run,
-        (next_scheduled_time,)
-    )
+    except Exception:
+        log.exception('Error while querying indices [%s], query [%s].', indices, query)
 
 
 # Based on click.Choice
@@ -398,8 +371,6 @@ def cli(**options):
     scheduler = None
 
     if not options['query_disable']:
-        scheduler = sched.scheduler()
-
         config = configparser.ConfigParser()
         config.read_file(options['config_file'])
 
@@ -419,12 +390,14 @@ def cli(**options):
 
                 queries[query_name] = (query_interval, query_timeout, query_indices, query)
 
+        scheduler = sched.scheduler()
+
         if queries:
             for name, (interval, timeout, indices, query) in queries.items():
-                func = partial(run_query, es_client, name, indices, query, timeout)
-                run_scheduler(scheduler, interval, func)
+                schedule_job(scheduler, interval,
+                             run_query, es_client, name, indices, query, timeout)
         else:
-            logging.warn('No queries found in config file %s', options['config_file'])
+            log.warning('No queries found in config file %s', options['config_file'])
 
     if not options['cluster_health_disable']:
         REGISTRY.register(ClusterHealthCollector(es_client,
@@ -447,9 +420,9 @@ def cli(**options):
     if scheduler:
         REGISTRY.register(QueryMetricCollector())
 
-    logging.info('Starting server...')
+    log.info('Starting server...')
     start_http_server(port)
-    logging.info('Server started on port %s', port)
+    log.info('Server started on port %s', port)
 
     if scheduler:
         scheduler.run()
