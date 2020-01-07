@@ -53,10 +53,12 @@ class ClusterHealthCollector(object):
             metrics = cluster_health_parser.parse_response(response, self.metric_name_list)
             metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
-            log.warning('Timeout while fetching %s (timeout %ss).', self.description, self.timeout)
+            log.warning('Timeout while fetching %(description)s (timeout %(timeout_s)ss).',
+                        {'description': self.description, 'timeout_s': self.timeout})
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         except Exception:
-            log.exception('Error while fetching %s.', self.description)
+            log.exception('Error while fetching %(description)s.',
+                          {'description': self.description})
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         else:
             yield from gauge_generator(metric_dict)
@@ -79,10 +81,12 @@ class NodesStatsCollector(object):
             metrics = nodes_stats_parser.parse_response(response, self.metric_name_list)
             metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
-            log.warning('Timeout while fetching %s (timeout %ss).', self.description, self.timeout)
+            log.warning('Timeout while fetching %(description)s (timeout %(timeout_s)ss).',
+                        {'description': self.description, 'timeout_s': self.timeout})
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         except Exception:
-            log.exception('Error while fetching %s.', self.description)
+            log.exception('Error while fetching %(description)s.',
+                          {'description': self.description})
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         else:
             yield from gauge_generator(metric_dict)
@@ -107,10 +111,12 @@ class IndicesStatsCollector(object):
             metrics = indices_stats_parser.parse_response(response, self.parse_indices, self.metric_name_list)
             metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
-            log.warning('Timeout while fetching %s (timeout %ss).', self.description, self.timeout)
+            log.warning('Timeout while fetching %(description)s (timeout %(timeout_s)ss).',
+                        {'description': self.description, 'timeout_s': self.timeout})
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         except Exception:
-            log.exception('Error while fetching %s.', self.description)
+            log.exception('Error while fetching %(description)s.',
+                          {'description': self.description})
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         else:
             yield from gauge_generator(metric_dict)
@@ -139,7 +145,8 @@ def run_query(es_client, query_name, indices, query,
         metric_dict = group_metrics(metrics)
 
     except Exception:
-        log.exception('Error while querying indices [%s], query [%s].', indices, query)
+        log.exception('Error while querying indices %(indices)s, query %(query)s.',
+                      {'indices': indices, 'query': query})
 
         # If this query has successfully run before, we need to handle any
         # metrics produced by that previous run.
@@ -472,7 +479,7 @@ def cli(**options):
                              run_query, es_client, query_name, indices, query,
                              timeout, on_error, on_missing)
         else:
-            log.warning('No queries found in config file %s', options['config_file'])
+            log.warning('No queries found in config file(s)')
 
     if not options['cluster_health_disable']:
         REGISTRY.register(ClusterHealthCollector(es_client,
@@ -497,7 +504,7 @@ def cli(**options):
 
     log.info('Starting server...')
     start_http_server(port)
-    log.info('Server started on port %s', port)
+    log.info('Server started on port %(port)s', {'port': port})
 
     if scheduler:
         scheduler.run()
