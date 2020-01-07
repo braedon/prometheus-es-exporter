@@ -111,21 +111,75 @@ def group_metrics(metrics):
     return metric_dict
 
 
-def gauge_generator(metrics):
+def merge_value_dicts(old_value_dict, new_value_dict, zero_missing=False):
+    """
+    Merge an old and new value dict together, returning the merged value dict.
+
+    Value dicts map from label values tuple -> metric value.
+
+    Values from the new value dict have precidence. If any label values tuples
+    from the old value dict are not present in the new value dict and
+    zero_missing is set, their values are reset to zero.
+    """
+    value_dict = new_value_dict.copy()
+    value_dict.update({
+        label_values: 0 if zero_missing else old_value
+        for label_values, old_value
+        in old_value_dict.items()
+        if label_values not in new_value_dict
+    })
+    return value_dict
+
+
+def merge_metric_dicts(old_metric_dict, new_metric_dict, zero_missing=False):
+    """
+    Merge an old and new metric dict together, returning the merged metric dict.
+
+    Metric dicts are keyed by metric name. Each metric name maps to a tuple
+    containing:
+    * metric documentation
+    * label keys tuple,
+    * dict of label values tuple -> metric value.
+
+    Values from the new metric dict have precidence. If any metric names from
+    the old metric dict are not present in the new metric dict and zero_missing
+    is set, their values are reset to zero.
+
+    Merging (and missing value zeroing, if set) is performed on the value dicts
+    for each metric, not just on the top level metrics themselves.
+    """
+    metric_dict = new_metric_dict.copy()
+    metric_dict.update({
+        metric_name: (
+            metric_doc,
+            label_keys,
+            merge_value_dicts(
+                old_value_dict,
+                new_value_dict=new_metric_dict[metric_name][2]
+                if metric_name in new_metric_dict else None,
+                zero_missing=zero_missing
+            )
+        )
+        for metric_name, (metric_doc, label_keys, old_value_dict)
+        in old_metric_dict.items()
+    })
+    return metric_dict
+
+
+def gauge_generator(metric_dict):
     """
     Generates GaugeMetricFamily instances for a list of metrics.
 
-    Takes metrics as a list of tuples containing:
-    * metric name,
-    * metric documentation,
-    * dict of label key -> label value,
-    * metric value.
+    Takes metrics as a dict keyed by metric name. Each metric name maps to a
+    tuple containing:
+    * metric documentation
+    * label keys tuple,
+    * dict of label values tuple -> metric value.
 
     Yields a GaugeMetricFamily instance for each unique metric name, containing
     children for the various label combinations. Suitable for use in a collect()
     method of a Prometheus collector.
     """
-    metric_dict = group_metrics(metrics)
 
     for metric_name, (metric_doc, label_keys, value_dict) in metric_dict.items():
         # If we have label keys we may have multiple different values,

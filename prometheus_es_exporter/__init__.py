@@ -16,7 +16,8 @@ from prometheus_client.core import GaugeMetricFamily, REGISTRY
 from . import cluster_health_parser
 from . import indices_stats_parser
 from . import nodes_stats_parser
-from .metrics import gauge_generator, format_metric_name
+from .metrics import (group_metrics, gauge_generator,
+                      format_metric_name, merge_metric_dicts)
 from .parser import parse_response
 from .scheduler import schedule_job
 from .utils import log_exceptions, nice_shutdown
@@ -28,18 +29,6 @@ CONTEXT_SETTINGS = {
 }
 
 METRICS_BY_QUERY = {}
-
-
-class QueryMetricCollector(object):
-
-    def collect(self):
-        # Copy METRICS_BY_QUERY before iterating over it
-        # as it may be updated by other threads.
-        # (only first level - lower levels are replaced
-        # wholesale, so don't worry about them)
-        query_metrics = METRICS_BY_QUERY.copy()
-        for metrics in query_metrics.values():
-            yield from gauge_generator(metrics)
 
 
 def collector_up_gauge(name_list, description, succeeded=True):
@@ -62,6 +51,7 @@ class ClusterHealthCollector(object):
             response = self.es_client.cluster.health(level=self.level, request_timeout=self.timeout)
 
             metrics = cluster_health_parser.parse_response(response, self.metric_name_list)
+            metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
             log.warning('Timeout while fetching %s (timeout %ss).', self.description, self.timeout)
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
@@ -69,7 +59,7 @@ class ClusterHealthCollector(object):
             log.exception('Error while fetching %s.', self.description)
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         else:
-            yield from gauge_generator(metrics)
+            yield from gauge_generator(metric_dict)
             yield collector_up_gauge(self.metric_name_list, self.description)
 
 
@@ -87,6 +77,7 @@ class NodesStatsCollector(object):
             response = self.es_client.nodes.stats(metric=self.metrics, request_timeout=self.timeout)
 
             metrics = nodes_stats_parser.parse_response(response, self.metric_name_list)
+            metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
             log.warning('Timeout while fetching %s (timeout %ss).', self.description, self.timeout)
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
@@ -94,7 +85,7 @@ class NodesStatsCollector(object):
             log.exception('Error while fetching %s.', self.description)
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         else:
-            yield from gauge_generator(metrics)
+            yield from gauge_generator(metric_dict)
             yield collector_up_gauge(self.metric_name_list, self.description)
 
 
@@ -114,6 +105,7 @@ class IndicesStatsCollector(object):
             response = self.es_client.indices.stats(metric=self.metrics, fields=self.fields, request_timeout=self.timeout)
 
             metrics = indices_stats_parser.parse_response(response, self.parse_indices, self.metric_name_list)
+            metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
             log.warning('Timeout while fetching %s (timeout %ss).', self.description, self.timeout)
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
@@ -121,18 +113,72 @@ class IndicesStatsCollector(object):
             log.exception('Error while fetching %s.', self.description)
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
         else:
-            yield from gauge_generator(metrics)
+            yield from gauge_generator(metric_dict)
             yield collector_up_gauge(self.metric_name_list, self.description)
 
 
-def run_query(es_client, name, indices, query, timeout):
+class QueryMetricCollector(object):
+
+    def collect(self):
+        # Copy METRICS_BY_QUERY before iterating over it
+        # as it may be updated by other threads.
+        # (only first level - lower levels are replaced
+        # wholesale, so don't worry about them)
+        query_metrics = METRICS_BY_QUERY.copy()
+        for metric_dict in query_metrics.values():
+            yield from gauge_generator(metric_dict)
+
+
+def run_query(es_client, query_name, indices, query,
+              timeout, on_error, on_missing):
+
     try:
         response = es_client.search(index=indices, body=query, request_timeout=timeout)
 
-        METRICS_BY_QUERY[name] = parse_response(response, [name])
+        metrics = parse_response(response, [query_name])
+        metric_dict = group_metrics(metrics)
 
     except Exception:
         log.exception('Error while querying indices [%s], query [%s].', indices, query)
+
+        # If this query has successfully run before, we need to handle any
+        # metrics produced by that previous run.
+        if query_name in METRICS_BY_QUERY:
+            old_metric_dict = METRICS_BY_QUERY[query_name]
+
+            if on_error == 'preserve':
+                metric_dict = old_metric_dict
+
+            elif on_error == 'drop':
+                metric_dict = {}
+
+            elif on_error == 'zero':
+                # Merging the old metric dict with an empty one, and zeroing
+                # any missing metrics, produces a metric dict with the same
+                # metrics, but all zero values.
+                metric_dict = merge_metric_dicts(old_metric_dict, {},
+                                                 zero_missing=True)
+
+            METRICS_BY_QUERY[query_name] = metric_dict
+
+    else:
+        # If this query has successfully run before, we need to handle any
+        # missing metrics.
+        if query_name in METRICS_BY_QUERY:
+            old_metric_dict = METRICS_BY_QUERY[query_name]
+
+            if on_missing == 'preserve':
+                metric_dict = merge_metric_dicts(old_metric_dict, metric_dict,
+                                                 zero_missing=False)
+
+            elif on_missing == 'drop':
+                pass  # use new metric dict untouched
+
+            elif on_missing == 'zero':
+                metric_dict = merge_metric_dicts(old_metric_dict, metric_dict,
+                                                 zero_missing=True)
+
+        METRICS_BY_QUERY[query_name] = metric_dict
 
 
 # Based on click.Choice
@@ -237,6 +283,25 @@ def indices_stats_fields_parser(ctx, param, value):
         return value
     else:
         return value.split(',')
+
+
+def configparser_enum_conv(enum):
+    lower_enums = tuple(e.lower() for e in enum)
+
+    def conv(value):
+        lower_value = value.lower()
+        if lower_value in lower_enums:
+            return lower_value
+        else:
+            raise ValueError('Value {} not value. Must be one of {}'.format(
+                             value, ','.join(enum)))
+
+    return conv
+
+
+CONFIGPARSER_CONVERTERS = {
+    'enum': configparser_enum_conv(('preserve', 'drop', 'zero'))
+}
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
@@ -371,7 +436,7 @@ def cli(**options):
     scheduler = None
 
     if not options['query_disable']:
-        config = configparser.ConfigParser()
+        config = configparser.ConfigParser(converters=CONFIGPARSER_CONVERTERS)
         config.read_file(options['config_file'])
 
         config_dir_file_pattern = os.path.join(options['config_dir'], '*.cfg')
@@ -383,19 +448,29 @@ def cli(**options):
         for section in config.sections():
             if section.startswith(query_prefix):
                 query_name = section[len(query_prefix):]
-                query_interval = config.getfloat(section, 'QueryIntervalSecs', fallback=15)
-                query_timeout = config.getfloat(section, 'QueryTimeoutSecs', fallback=10)
-                query_indices = config.get(section, 'QueryIndices', fallback='_all')
+                interval = config.getfloat(section, 'QueryIntervalSecs',
+                                           fallback=15)
+                timeout = config.getfloat(section, 'QueryTimeoutSecs',
+                                          fallback=10)
+                indices = config.get(section, 'QueryIndices',
+                                     fallback='_all')
                 query = json.loads(config.get(section, 'QueryJson'))
+                on_error = config.getenum(section, 'QueryOnError',
+                                          fallback='drop')
+                on_missing = config.getenum(section, 'QueryOnMissing',
+                                            fallback='drop')
 
-                queries[query_name] = (query_interval, query_timeout, query_indices, query)
+                queries[query_name] = (interval, timeout, indices, query,
+                                       on_error, on_missing)
 
         scheduler = sched.scheduler()
 
         if queries:
-            for name, (interval, timeout, indices, query) in queries.items():
+            for query_name, (interval, timeout, indices, query,
+                             on_error, on_missing) in queries.items():
                 schedule_job(scheduler, interval,
-                             run_query, es_client, name, indices, query, timeout)
+                             run_query, es_client, query_name, indices, query,
+                             timeout, on_error, on_missing)
         else:
             log.warning('No queries found in config file %s', options['config_file'])
 
