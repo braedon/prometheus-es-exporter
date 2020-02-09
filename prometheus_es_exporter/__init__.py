@@ -10,7 +10,6 @@ import time
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConnectionTimeout
 from jog import JogFormatter
-from prometheus_client import start_http_server
 from prometheus_client.core import GaugeMetricFamily, REGISTRY
 
 from . import cluster_health_parser
@@ -20,7 +19,7 @@ from .metrics import (group_metrics, gauge_generator,
                       format_metric_name, merge_metric_dicts)
 from .parser import parse_response
 from .scheduler import schedule_job
-from .utils import log_exceptions, nice_shutdown
+from .utils import log_exceptions, nice_shutdown, start_http_server
 
 log = logging.getLogger(__name__)
 
@@ -339,6 +338,10 @@ CONFIGPARSER_CONVERTERS = {
                    'Must be specified if "--basic-user" is provided.')
 @click.option('--port', '-p', default=9206,
               help='Port to serve the metrics endpoint on. (default: 9206)')
+@click.option('--ipv6/--ipv4', default=False, is_flag=True,
+              help='Whether to serve the metrics endpoint on IPv6 or IPv4. '
+                   'Will bind to `::` for IPv6, or `0.0.0.0` for IPv4. '
+                   '(default: IPv4)')
 @click.option('--query-disable', default=False, is_flag=True,
               help='Disable query monitoring. '
                    'Config file does not need to be present if query monitoring is disabled.')
@@ -503,8 +506,9 @@ def cli(**options):
         REGISTRY.register(QueryMetricCollector())
 
     log.info('Starting server...')
-    start_http_server(port)
-    log.info('Server started on port %(port)s', {'port': port})
+    start_http_server(port, ipv6=options['ipv6'])
+    log.info('Server started on %(protocol)s, port %(port)s',
+             {'port': port, 'protocol': 'IPv6' if options['ipv6'] else 'IPv4'})
 
     if scheduler:
         scheduler.run()

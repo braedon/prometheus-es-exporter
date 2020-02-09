@@ -1,9 +1,12 @@
 import functools
 import logging
 import signal
+import socket
 import sys
 
 from collections import OrderedDict
+from prometheus_client import REGISTRY, start_http_server as orig_start_http_server
+from prometheus_client.exposition import _ThreadingSimpleServer
 
 log = logging.getLogger(__name__)
 
@@ -87,3 +90,12 @@ def nice_shutdown(shutdown_signals=(signal.SIGINT, signal.SIGTERM)):
         return wrapper
 
     return decorator
+
+
+def start_http_server(port, addr='', registry=REGISTRY, ipv6=False):
+    # Monkeypatch the server class address family to support IPv6 if needed.
+    if ipv6:
+        _ThreadingSimpleServer.address_family = socket.AF_INET6
+
+    # Call original start_http_server()
+    orig_start_http_server(port, addr=addr, registry=registry)
