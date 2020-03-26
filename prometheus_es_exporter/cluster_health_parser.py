@@ -29,6 +29,9 @@ def parse_block(block, metric=None, labels=None):
     elif status == 'red':
         status_int = 2
     metrics.append((metric + ['status'], '', labels, status_int))
+    for colour in ['green', 'yellow', 'red']:
+        metrics.append((metric + ['status', colour], '', labels,
+                        1 if status == colour else 0))
 
     for key, value in block.items():
         if isinstance(value, bool):
