@@ -83,4 +83,18 @@ To build a docker image directly from the git repo, run the following in the roo
 ```
 > sudo docker build -t <your repository name and tag> .
 ```
+
+To develop in a docker container file you should first build the container using
+```
+> sudo docker build -t exporter:latest
+```
+Then run (in the root of the git repo)
+```
+> sudo docker run --rm -it --name exporter --entrypoint bash $(pwd):/usr/src/app exporter:latest
+```
+This will mount all the files inside the container, so editing tests or application code will be synced live. You can run the tests with `python -m unittest`. You may need to run `pip install -e .` again after running the container if you get an error like
+```
+pkg_resources.DistributionNotFound: The 'prometheus-es-exporter' distribution was not found and is required by the application
+```
+
 Send me a PR if you have a change you want to contribute!
