@@ -45,8 +45,11 @@ By default, it will bind to port 9206, query Elasticsearch on `localhost:9200` a
 ```
 Run with the `-h` flag to see details on all the available options.
 
-Note that all options can be set via environment variables. The environment variable names are prefixed with `ES_EXPORTER`, e.g. `ES_EXPORTER_BASIC_USER=fred` is equivalent to `--basic-user fred`. CLI options take precidence over environment variables.
+Note that all options can be set via environment variables. The environment variable names are prefixed with `ES_EXPORTER`, e.g. `ES_EXPORTER_BASIC_USER=fred` is equivalent to `--basic-user fred`. CLI options take precedence over environment variables.
 
+Command line options can also be set from a configuration file, by passing `--config FILE`. The format of the file should be [Configobj's unrepre mode](https://configobj.readthedocs.io/en/latest/configobj.html#unrepr-mode), so instead of `--basic-user fred` you could use a configuration file `config_file` with `basic-user="fred"` in it, and pass `--config config_file`. CLI options and environment variables take precedence over configuration files.
+
+CLI options, environment variables, and configuration files all override any default options. The full resolution order for a given option is: CLI > Environment > Configuration file > Default.
 
 See the provided [exporter.cfg](exporter.cfg) file for query configuration examples and explanation.
 
@@ -83,4 +86,14 @@ To build a docker image directly from the git repo, run the following in the roo
 ```
 > sudo docker build -t <your repository name and tag> .
 ```
+
+To develop in a docker container, first build the image, and then run the following in the root project directory:
+```
+> sudo docker run --rm -it --name exporter --entrypoint bash -v $(pwd):/usr/src/app <your repository name and tag>
+```
+This will mount all the files inside the container, so editing tests or application code will be synced live. You can run the tests with `python -m unittest`. You may need to run `pip install -e .` again after running the container if you get an error like
+```
+pkg_resources.DistributionNotFound: The 'prometheus-es-exporter' distribution was not found and is required by the application
+```
+
 Send me a PR if you have a change you want to contribute!

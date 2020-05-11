@@ -24,6 +24,7 @@ setup(
     python_requires='>=3.5',
     install_requires=[
         'click',
+        'click-config-file',
         'elasticsearch',
         'jog',
         'prometheus-client >= 0.6.0',

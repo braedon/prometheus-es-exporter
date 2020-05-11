@@ -1,4 +1,5 @@
 import click
+import click_config_file
 import configparser
 import glob
 import json
@@ -392,9 +393,9 @@ CONFIGPARSER_CONVERTERS = {
               help='Detail level to log. (default: INFO)')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Turn on verbose (DEBUG) logging. Overrides --log-level.')
+@click_config_file.configuration_option()
 def cli(**options):
     """Export Elasticsearch query results to Prometheus."""
-
     if options['basic_user'] and options['basic_password'] is None:
         click.BadOptionUsage('basic_user', 'Username provided with no password.')
     elif options['basic_user'] is None and options['basic_password']:
