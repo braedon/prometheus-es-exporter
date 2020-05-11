@@ -396,8 +396,6 @@ CONFIGPARSER_CONVERTERS = {
 @click_config_file.configuration_option()
 def cli(**options):
     """Export Elasticsearch query results to Prometheus."""
-    print(options)
-    return
     if options['basic_user'] and options['basic_password'] is None:
         click.BadOptionUsage('basic_user', 'Username provided with no password.')
     elif options['basic_user'] is None and options['basic_password']:
