@@ -1,9 +1,17 @@
 from setuptools import setup, find_packages
+from os import path
+
+
+this_directory = path.abspath(path.dirname(__file__))
+with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
+    long_description = f.read()
 
 setup(
     name='prometheus-es-exporter',
     version='0.9.0.dev1',
     description='Elasticsearch query Prometheus exporter',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     url='https://github.com/braedon/prometheus-es-exporter',
     author='Braedon Vickers',
     author_email='braedon.vickers@gmail.com',
