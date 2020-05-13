@@ -2,6 +2,8 @@ Prometheus Elasticsearch Exporter
 ====
 This Prometheus exporter collects metrics from queries run on an Elasticsearch cluster's data, and metrics about the cluster itself.
 
+[Source Code](https://github.com/braedon/prometheus-es-exporter) | [Python Package](https://pypi.org/project/prometheus-es-exporter) | [Docker Image](https://hub.docker.com/r/braedon/prometheus-es-exporter)
+
 ## Query Metrics
 The exporter periodically runs configured queries against the Elasticsearch cluster and exports the results as Prometheus gauge metrics.
 
