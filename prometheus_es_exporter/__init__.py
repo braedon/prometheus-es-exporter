@@ -15,6 +15,7 @@ from prometheus_client import start_http_server
 from prometheus_client.core import GaugeMetricFamily, REGISTRY
 
 from . import cluster_health_parser
+from . import indices_mappings_parser
 from . import indices_stats_parser
 from . import nodes_stats_parser
 from .metrics import (group_metrics, gauge_generator,
@@ -80,6 +81,33 @@ class NodesStatsCollector(object):
             response = self.es_client.nodes.stats(metric=self.metrics, request_timeout=self.timeout)
 
             metrics = nodes_stats_parser.parse_response(response, self.metric_name_list)
+            metric_dict = group_metrics(metrics)
+        except ConnectionTimeout:
+            log.warning('Timeout while fetching %(description)s (timeout %(timeout_s)ss).',
+                        {'description': self.description, 'timeout_s': self.timeout})
+            yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
+        except Exception:
+            log.exception('Error while fetching %(description)s.',
+                          {'description': self.description})
+            yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
+        else:
+            yield from gauge_generator(metric_dict)
+            yield collector_up_gauge(self.metric_name_list, self.description)
+
+
+class IndicesMappingsCollector(object):
+    def __init__(self, es_client, timeout):
+        self.metric_name_list = ['es', 'indices_mappings']
+        self.description = 'Indices Mappings'
+
+        self.es_client = es_client
+        self.timeout = timeout
+
+    def collect(self):
+        try:
+            response = self.es_client.indices.get_mapping(request_timeout=self.timeout)
+
+            metrics = indices_mappings_parser.parse_response(response, self.metric_name_list)
             metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
             log.warning('Timeout while fetching %(description)s (timeout %(timeout_s)ss).',
@@ -370,6 +398,10 @@ CONFIGPARSER_CONVERTERS = {
               type=MultiChoice(NODES_STATS_METRICS_OPTIONS),
               help='Limit nodes stats to specific metrics. '
                    'Metrics should be separated by commas e.g. indices,fs.')
+@click.option('--indices-mappings-disable', default=False, is_flag=True,
+              help='Disable indices mappings monitoring.')
+@click.option('--indices-mappings-timeout', default=10.0,
+              help='Request timeout for indices mappings monitoring, in seconds. (default: 10)')
 @click.option('--indices-stats-disable', default=False, is_flag=True,
               help='Disable indices stats monitoring.')
 @click.option('--indices-stats-timeout', default=10.0,
@@ -491,6 +523,10 @@ def cli(**options):
         REGISTRY.register(NodesStatsCollector(es_client,
                                               options['nodes_stats_timeout'],
                                               metrics=options['nodes_stats_metrics']))
+
+    if not options['indices_mappings_disable']:
+        REGISTRY.register(IndicesMappingsCollector(es_client,
+                                                   options['indices_mappings_timeout']))
 
     if not options['indices_stats_disable']:
         parse_indices = options['indices_stats_mode'] == 'indices'
