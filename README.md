@@ -29,6 +29,11 @@ Endpoint responses are parsed into metrics as generically as possible so that (h
 
 See [tests/test_cluster_health_parser.py](tests/test_cluster_health_parser.py), [tests/test_nodes_stats_parser.py](tests/test_nodes_stats_parser.py), and [tests/test_indices_stats_parser.py](tests/test_indices_stats_parser.py) for examples of responses and the metrics produced.
 
+The exporter also queries the `_mappings` endpoint to produce the following metric:
+
+### `es_indices_mappings_field_count{index, field_type}` (gauge)
+The number of mapped fields of a given type in an index. Sum by index to calculate the total fields per index. Useful for checking is at risk of reaching a field limit.
+
 # Installation
 The exporter requires Python 3 and Pip 3 to be installed.
 
