@@ -370,9 +370,9 @@ CONFIGPARSER_CONVERTERS = {
               help='Port to serve the metrics endpoint on. (default: 9206)')
 @click.option('--query-disable', default=False, is_flag=True,
               help='Disable query monitoring. '
-                   'Config file does not need to be present if query monitoring is disabled.')
-@click.option('--config-file', '-c', default='exporter.cfg', type=click.File(),
-              help='Path to query config file. '
+                   'No config files/queries need to be present if query monitoring is disabled.')
+@click.option('--config-file', '-c', default='exporter.cfg', type=click.Path(dir_okay=False),
+              help='Path to the main query config file. '
                    'Can be absolute, or relative to the current working directory. '
                    '(default: exporter.cfg)')
 @click.option('--config-dir', default='./config', type=click.Path(file_okay=False),
@@ -477,7 +477,7 @@ def cli(**options):
 
     if not options['query_disable']:
         config = configparser.ConfigParser(converters=CONFIGPARSER_CONVERTERS)
-        config.read_file(options['config_file'])
+        config.read(options['config_file'])
 
         config_dir_file_pattern = os.path.join(options['config_dir'], '*.cfg')
         config_dir_sorted_files = sorted(glob.glob(config_dir_file_pattern))
@@ -512,7 +512,8 @@ def cli(**options):
                              run_query, es_client, query_name, indices, query,
                              timeout, on_error, on_missing)
         else:
-            log.warning('No queries found in config file(s)')
+            log.error('No queries found in config file(s)')
+            return
 
     if not options['cluster_health_disable']:
         REGISTRY.register(ClusterHealthCollector(es_client,
