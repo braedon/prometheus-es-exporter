@@ -38,7 +38,7 @@ The number of mapped fields of a given type in an index. Sum by index to calcula
 The exporter requires Python 3 and Pip 3 to be installed.
 
 To install the latest published version via Pip, run:
-```
+```bash
 > pip3 install prometheus-es-exporter
 ```
 Note that you may need to add the start script location (see pip output) to your `PATH`.
@@ -47,7 +47,7 @@ Note that you may need to add the start script location (see pip output) to your
 Once installed, you can run the exporter with the `prometheus-es-exporter` command.
 
 By default, it will bind to port 9206, query Elasticsearch on `localhost:9200` and run queries configured in a file `exporter.cfg` in the working directory. You can change these defaults as required by passing in options:
-```
+```bash
 > prometheus-es-exporter -p <port> -e <elasticsearch nodes> -c <path to query config file>
 ```
 Run with the `-h` flag to see details on all the available options.
@@ -62,11 +62,11 @@ See the provided [exporter.cfg](exporter.cfg) file for query configuration examp
 
 # Docker
 Docker images for released versions can be found on Docker Hub (note that no `latest` version is provided):
-```
+```bash
 > sudo docker pull braedon/prometheus-es-exporter:<version>
 ```
 To run a container successfully, you will need to mount a query config file to `/usr/src/app/exporter.cfg` and map container port 9206 to a port on the host. Any options placed after the image name (`prometheus-es-exporter`) will be passed to the process inside the container. For example, you will need to use this to configure the elasticsearch node(s) using `-e`.
-```
+```bash
 > sudo docker run --rm --name exporter \
     -v <path to query config file>:/usr/src/app/exporter.cfg \
     -p <host port>:9206 \
@@ -76,26 +76,26 @@ If you don't want to mount the query config file in at run time, you could exten
 
 # Development
 To install directly from the git repo, run the following in the root project directory:
-```
+```bash
 > pip3 install .
 ```
 The exporter can be installed in "editable" mode, using pip's `-e` flag. This allows you to test out changes without having to re-install.
-```
+```bash
 > pip3 install -e .
 ```
 To run tests (as usual, from the root project directory), use:
-```
+```bash
 > python3 -m unittest
 ```
 Note that these tests currently only cover the response parsing functionality - there are no automated system tests as of yet.
 
 To build a docker image directly from the git repo, run the following in the root project directory:
-```
+```bash
 > sudo docker build -t <your repository name and tag> .
 ```
 
 To develop in a docker container, first build the image, and then run the following in the root project directory:
-```
+```bash
 > sudo docker run --rm -it --name exporter --entrypoint bash -v $(pwd):/usr/src/app <your repository name and tag>
 ```
 This will mount all the files inside the container, so editing tests or application code will be synced live. You can run the tests with `python -m unittest`. You may need to run `pip install -e .` again after running the container if you get an error like
