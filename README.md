@@ -29,10 +29,27 @@ Endpoint responses are parsed into metrics as generically as possible so that (h
 
 See [tests/test_cluster_health_parser.py](tests/test_cluster_health_parser.py), [tests/test_nodes_stats_parser.py](tests/test_nodes_stats_parser.py), and [tests/test_indices_stats_parser.py](tests/test_indices_stats_parser.py) for examples of responses and the metrics produced.
 
-The exporter also queries the `_mappings` endpoint to produce the following metric:
+The exporter also produces the following metrics:
+
+### `es_indices_aliases_alias{index, alias}` (gauge)
+Index aliases and the indices they point to. Parsed from the `_alias` endpoint.
+
+Metrics for current aliases have the value `1`. If an alias is removed, or changes the index it points too, old metrics will be dropped immediately.
+
+Note that Prometheus may [keep returning dropped metrics for a short period](https://prometheus.io/docs/prometheus/latest/querying/basics/#staleness) (usually 5 minutes). In the future, old metrics may return `0` for a period before being dropped to mitigate this issue. As such, it's best to check the metric value, not just its existence.
+
+Filter other index metrics by alias using the `and` operator and this metric, e.g.:
+```
+es_indices_mappings_field_count and on(index) (es_indices_aliases_alias{alias="logstash-today"} == 1)
+```
 
 ### `es_indices_mappings_field_count{index, field_type}` (gauge)
-The number of mapped fields of a given type in an index. Sum by index to calculate the total fields per index. Useful for checking is at risk of reaching a field limit.
+The number of mapped fields of a given type in an index. Parsed from the `_mappings` endpoint.
+
+Sum by index to calculate the total fields per index. Useful for checking if an index is at risk of reaching a field limit, e.g.
+```
+sum(es_indices_mappings_field_count) by(index) > 900
+```
 
 # Installation
 The exporter requires Python 3 and Pip 3 to be installed.
