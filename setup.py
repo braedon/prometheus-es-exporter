@@ -8,7 +8,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='prometheus-es-exporter',
-    version='0.11.0.dev1',
+    version='0.11.0',
     description='Elasticsearch query Prometheus exporter',
     long_description=long_description,
     long_description_content_type='text/markdown',
