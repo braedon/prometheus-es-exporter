@@ -2,7 +2,7 @@ Prometheus Elasticsearch Exporter
 ====
 This Prometheus exporter collects metrics from queries run on an Elasticsearch cluster's data, and metrics about the cluster itself.
 
-[Source Code](https://github.com/braedon/prometheus-es-exporter) | [Python Package](https://pypi.org/project/prometheus-es-exporter) | [Docker Image](https://hub.docker.com/r/braedon/prometheus-es-exporter)
+[Source Code](https://github.com/braedon/prometheus-es-exporter) | [Python Package](https://pypi.org/project/prometheus-es-exporter) | [Docker Image](https://hub.docker.com/r/braedon/prometheus-es-exporter) | [Helm Chart](https://braedon.github.io/helm/prometheus-es-exporter)
 
 ## Query Metrics
 The exporter periodically runs configured queries against the Elasticsearch cluster and exports the results as Prometheus gauge metrics.
@@ -73,6 +73,18 @@ To run a container successfully, you will need to mount a query config file to `
     braedon/prometheus-es-exporter:<version> -e <elasticsearch nodes>
 ```
 If you don't want to mount the query config file in at run time, you could extend an existing image with your own Dockerfile that copies the config file in at build time.
+
+# Helm
+A Helm chart is available from the Helm repo at [https://braedon.github.io/helm](https://braedon.github.io/helm/).
+```bash
+> helm repo add braedon https://braedon.github.com/helm
+> helm repo update
+
+> helm install braedon/prometheus-es-exporter --name <release name> \
+                                              --set elasticsearch.cluster=<elasticsearch nodes> \
+                                              --set image.tag=<image tag>
+```
+See the [`prometheus-es-exporter` chart README](https://braedon.github.io/helm/prometheus-es-exporter/) for more details on how to configure the chart.
 
 # Development
 To install directly from the git repo, run the following in the root project directory:
