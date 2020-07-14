@@ -50,8 +50,17 @@ def parse_block(block, metric=None, labels=None):
             elif isinstance(value, list) and key in bucket_list_keys:
                 bucket_name_key = bucket_list_keys[key]
 
-                for n_value in value:
-                    bucket_name = n_value[bucket_name_key]
+                for n, n_value in enumerate(value):
+                    if bucket_name_key in n_value:
+                        bucket_name = n_value[bucket_name_key]
+                    else:
+                        # If the expected bucket name key isn't present, fall back to using the
+                        # bucket's position in the list as the bucket name. It's not guaranteed that
+                        # the buckets will remain in the same order between calls, but it's the best
+                        # option available.
+                        # e.g. For AWS managed Elasticsearch instances, the `path` key is missing
+                        #      from the filesystem `data` directory buckets.
+                        bucket_name = str(n)
                     metrics.extend(parse_block(n_value, metric=metric + [key], labels=merge_dicts_ordered(labels, {bucket_name_key: [bucket_name]})))
 
     return metrics
