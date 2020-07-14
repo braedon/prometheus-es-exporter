@@ -743,6 +743,39 @@ class Test(unittest.TestCase):
         result = convert_result(parse_response(response))
         self.assertEqual(expected, result)
 
+    def test_endpoint_aws(self):
+        # AWS managed Elasticsearch clusters return modified responses to the /_nodes/stats endpoint.
+        # (Response trimmed to data with meaningful differences to usual response)
+        response = {
+            'nodes': {
+                'bRcKq5zUTAuwNf4qvnXzIQ': {
+                    'name': 'bRcKq5z',
+                    'fs': {
+                        'data': [
+                            {
+                                # `path` and `mount` keys missing.
+                                # 'path': '/usr/share/elasticsearch/data/nodes/0',
+                                # 'mount': '/usr/share/elasticsearch/data (/dev/mapper/ubuntu--vg-root)',
+                                'type': 'ext4',
+                                'total_in_bytes': 233134567424,
+                                'free_in_bytes': 92206276608,
+                                'available_in_bytes': 80292356096,
+                                'spins': 'true'
+                            }
+                        ],
+                    },
+                }
+            }
+        }
+
+        expected = {
+            'fs_data_total_in_bytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",path="0"}': 233134567424,
+            'fs_data_free_in_bytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",path="0"}': 92206276608,
+            'fs_data_available_in_bytes{node_id="bRcKq5zUTAuwNf4qvnXzIQ",node_name="bRcKq5z",path="0"}': 80292356096,
+        }
+        result = convert_result(parse_response(response))
+        self.assertEqual(expected, result)
+
 
 if __name__ == '__main__':
     unittest.main()
