@@ -156,7 +156,7 @@ def merge_metric_dicts(old_metric_dict, new_metric_dict, zero_missing=False):
             merge_value_dicts(
                 old_value_dict,
                 new_value_dict=new_metric_dict[metric_name][2]
-                if metric_name in new_metric_dict else None,
+                if metric_name in new_metric_dict else {},
                 zero_missing=zero_missing
             )
         )
