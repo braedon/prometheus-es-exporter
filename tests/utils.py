@@ -23,14 +23,19 @@ def format_metrics(metric_name, label_keys, value_dict):
     return metrics
 
 
-# Converts the parse_response() result into a psuedo-prometheus format
-# that is useful for comparing results in tests.
-# Uses the 'group_metrics()' function used by the exporter, so effectively
-# tests that function.
-def convert_result(result):
-    metric_dict = group_metrics(result)
+# Converts a metric into a psuedo-prometheus format that is useful for comparing results in tests.
+# Uses the 'group_metrics()' function used by the exporter, so effectively tests that function.
+def convert_metric_dict(metric_dict):
     return {
         metric: value
         for metric_name, (metric_doc, label_keys, value_dict) in metric_dict.items()
         for metric, value in format_metrics(metric_name, label_keys, value_dict).items()
     }
+
+
+# Converts the parse_response() result into a psuedo-prometheus format that is useful for comparing
+# results in tests.
+# Uses the 'group_metrics()' function used by the exporter, so effectively tests that function.
+def convert_result(result):
+    metric_dict = group_metrics(result)
+    return convert_metric_dict(metric_dict)
