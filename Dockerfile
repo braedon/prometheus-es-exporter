@@ -8,6 +8,7 @@ RUN pip install -e .
 
 COPY prometheus_es_exporter/*.py /usr/src/app/prometheus_es_exporter/
 COPY LICENSE /usr/src/app/
+COPY exporter.cfg /usr/src/app/exporter.cfg
 
 EXPOSE 9206
 
