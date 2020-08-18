@@ -15,6 +15,7 @@ from prometheus_client import start_http_server
 from prometheus_client.core import GaugeMetricFamily, REGISTRY
 
 from . import cluster_health_parser
+from . import consul_client
 from . import indices_aliases_parser
 from . import indices_mappings_parser
 from . import indices_stats_parser
@@ -375,7 +376,20 @@ CONFIGPARSER_CONVERTERS = {
                    'Ports can be provided if non-standard (9200) e.g. es1:9999. '
                    'Include the scheme for non-http nodes e.g. https://es1:9200. '
                    '--ca-certs must be provided for SSL certificate verification. '
+                   'For Consul discovery of nodes, enter "consul" as the value.'
                    '(default: localhost)')
+@click.option('--es-service', default='elasticsearch',
+              help='The name of the Elasticsearch service registered to the Consul agent.'
+                   'Only used if "consul" is supplied for the es-cluster value.'
+                   '(default: elasticsearch)')
+@click.option('--consul-host', default='localhost',
+              help='Host of the Consul agent used to lookup the Elasticsearch service.'
+                   'Only used if "consul" is supplied for the es-cluster value.'
+                   '(default: localhost)')
+@click.option('--consul-port', default=8500,
+              help='Port of the Consul agent used to lookup the Elasticsearch service.'
+                   'Only used if "consul" is supplied for the es-cluster value.'
+                   '(default: 8500)')
 @click.option('--ca-certs',
               help='Path to a CA certificate bundle. '
                    'Can be absolute, or relative to the current working directory. '
@@ -492,6 +506,15 @@ def cli(**options):
 
     port = options['port']
     es_cluster = options['es_cluster'].split(',')
+
+    if es_cluster == ['consul']:
+        consul_host = options['consul_host']
+        consul_port = options['consul_port']
+        log.info('Connecting to Consul agent at {}:{}.'.format(consul_host, consul_port))
+        consul_client.connect(consul_host, consul_port)
+
+        es_cluster = [consul_client.get_service_address(options['es_service'])]
+        log.info('Found Elasticsearch registered at {}.'.format(es_cluster))
 
     if options['ca_certs']:
         es_client = Elasticsearch(es_cluster,
