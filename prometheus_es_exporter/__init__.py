@@ -151,22 +151,26 @@ class IndicesMappingsCollector(object):
 
 
 class IndicesStatsCollector(object):
-    def __init__(self, es_client, timeout, parse_indices=False, metrics=None, fields=None):
+    def __init__(self, es_client, indices, timeout, parse_indices=False, metrics=None, fields=None):
         self.metric_name_list = ['es', 'indices_stats']
         self.description = 'Indices Stats'
 
         self.es_client = es_client
         self.timeout = timeout
+        self.indices = indices
         self.parse_indices = parse_indices
         self.metrics = metrics
         self.fields = fields
 
     def collect(self):
         try:
-            response = self.es_client.indices.stats(metric=self.metrics, fields=self.fields, request_timeout=self.timeout)
+            for index in self.indices:
+                response = self.es_client.indices.stats(index=index, metric=self.metrics, fields=self.fields, request_timeout=self.timeout)
 
-            metrics = indices_stats_parser.parse_response(response, self.parse_indices, self.metric_name_list)
-            metric_dict = group_metrics(metrics)
+                metrics = indices_stats_parser.parse_response(response, self.parse_indices, self.metric_name_list)
+                metric_dict = group_metrics(metrics)
+                yield from gauge_generator(metric_dict)
+                yield collector_up_gauge(self.metric_name_list, self.description)
         except ConnectionTimeout:
             log.warning('Timeout while fetching %(description)s (timeout %(timeout_s)ss).',
                         {'description': self.description, 'timeout_s': self.timeout})
@@ -175,9 +179,6 @@ class IndicesStatsCollector(object):
             log.exception('Error while fetching %(description)s.',
                           {'description': self.description})
             yield collector_up_gauge(self.metric_name_list, self.description, succeeded=False)
-        else:
-            yield from gauge_generator(metric_dict)
-            yield collector_up_gauge(self.metric_name_list, self.description)
 
 
 class QueryMetricCollector(object):
@@ -507,6 +508,7 @@ def cli(**options):
 
     scheduler = None
 
+    indices_for_stats = config.get('INDICES_FOR_STATS_METRICS', 'indices', fallback='_all').split(',')
     if not options['query_disable']:
         config = configparser.ConfigParser(converters=CONFIGPARSER_CONVERTERS)
         config.read(options['config_file'])
@@ -568,6 +570,7 @@ def cli(**options):
     if not options['indices_stats_disable']:
         parse_indices = options['indices_stats_mode'] == 'indices'
         REGISTRY.register(IndicesStatsCollector(es_client,
+                                                indices_for_stats,
                                                 options['indices_stats_timeout'],
                                                 parse_indices=parse_indices,
                                                 metrics=options['indices_stats_metrics'],
