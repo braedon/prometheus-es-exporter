@@ -507,8 +507,7 @@ def cli(**options):
                                   http_auth=http_auth)
 
     scheduler = None
-
-    indices_for_stats = config.get('INDICES_FOR_STATS_METRICS', 'indices', fallback='_all').split(',')
+    indices_for_stats = [] 
     if not options['query_disable']:
         config = configparser.ConfigParser(converters=CONFIGPARSER_CONVERTERS)
         config.read(options['config_file'])
@@ -518,6 +517,7 @@ def cli(**options):
         config.read(config_dir_sorted_files)
 
         query_prefix = 'query_'
+        indices_for_stats = config.get('INDICES_FOR_STATS_METRICS', 'indices', fallback='_all').split(',')
         queries = {}
         for section in config.sections():
             if section.startswith(query_prefix):
