@@ -20,10 +20,8 @@ def check_connection(func):
 
 @check_connection
 def get_service_address(service: str) -> str:
-    services = client.agent.services()
-    service_def = services.get(service)
-
-    if not service_def:
+    index, service_defs = client.catalog.service(service)
+    if not service_defs or len(service_defs) == 0:
         raise Exception('Service {} is not registered to the Consul agent.')
-
-    return '{}:{}'.format(service_def['Address'], service_def['Port'])
+    service_def = service_defs.pop()
+    return '{}:{}'.format(service_def['Address'], service_def['ServicePort'])
