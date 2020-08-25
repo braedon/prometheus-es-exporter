@@ -8,7 +8,8 @@ import os
 import sched
 import time
 
-from elasticsearch import Elasticsearch
+from requests_aws4auth import AWS4Auth
+from elasticsearch import Elasticsearch, RequestsHttpConnection
 from elasticsearch.exceptions import ConnectionTimeout
 from jog import JogFormatter
 from prometheus_client import start_http_server
@@ -51,9 +52,11 @@ class ClusterHealthCollector(object):
 
     def collect(self):
         try:
-            response = self.es_client.cluster.health(level=self.level, request_timeout=self.timeout)
+            response = self.es_client.cluster.health(
+                level=self.level, request_timeout=self.timeout)
 
-            metrics = cluster_health_parser.parse_response(response, self.metric_name_list)
+            metrics = cluster_health_parser.parse_response(
+                response, self.metric_name_list)
             metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
             log.warning('Timeout while fetching %(description)s (timeout %(timeout_s)ss).',
@@ -79,9 +82,11 @@ class NodesStatsCollector(object):
 
     def collect(self):
         try:
-            response = self.es_client.nodes.stats(metric=self.metrics, request_timeout=self.timeout)
+            response = self.es_client.nodes.stats(
+                metric=self.metrics, request_timeout=self.timeout)
 
-            metrics = nodes_stats_parser.parse_response(response, self.metric_name_list)
+            metrics = nodes_stats_parser.parse_response(
+                response, self.metric_name_list)
             metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
             log.warning('Timeout while fetching %(description)s (timeout %(timeout_s)ss).',
@@ -106,9 +111,11 @@ class IndicesAliasesCollector(object):
 
     def collect(self):
         try:
-            response = self.es_client.indices.get_alias(request_timeout=self.timeout)
+            response = self.es_client.indices.get_alias(
+                request_timeout=self.timeout)
 
-            metrics = indices_aliases_parser.parse_response(response, self.metric_name_list)
+            metrics = indices_aliases_parser.parse_response(
+                response, self.metric_name_list)
             metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
             log.warning('Timeout while fetching %(description)s (timeout %(timeout_s)ss).',
@@ -133,9 +140,11 @@ class IndicesMappingsCollector(object):
 
     def collect(self):
         try:
-            response = self.es_client.indices.get_mapping(request_timeout=self.timeout)
+            response = self.es_client.indices.get_mapping(
+                request_timeout=self.timeout)
 
-            metrics = indices_mappings_parser.parse_response(response, self.metric_name_list)
+            metrics = indices_mappings_parser.parse_response(
+                response, self.metric_name_list)
             metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
             log.warning('Timeout while fetching %(description)s (timeout %(timeout_s)ss).',
@@ -163,9 +172,11 @@ class IndicesStatsCollector(object):
 
     def collect(self):
         try:
-            response = self.es_client.indices.stats(metric=self.metrics, fields=self.fields, request_timeout=self.timeout)
+            response = self.es_client.indices.stats(
+                metric=self.metrics, fields=self.fields, request_timeout=self.timeout)
 
-            metrics = indices_stats_parser.parse_response(response, self.parse_indices, self.metric_name_list)
+            metrics = indices_stats_parser.parse_response(
+                response, self.parse_indices, self.metric_name_list)
             metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
             log.warning('Timeout while fetching %(description)s (timeout %(timeout_s)ss).',
@@ -196,7 +207,8 @@ def run_query(es_client, query_name, indices, query,
               timeout, on_error, on_missing):
 
     try:
-        response = es_client.search(index=indices, body=query, request_timeout=timeout)
+        response = es_client.search(
+            index=indices, body=query, request_timeout=timeout)
 
         metrics = parse_response(response, [query_name])
         metric_dict = group_metrics(metrics)
@@ -450,10 +462,23 @@ CONFIGPARSER_CONVERTERS = {
               help='Include fielddata info for specific fields. '
                    'Fields should be separated by commas e.g. indices,fs. '
                    'Use \'*\' for all.')
+@click.option('--chaos-search',
+              help='Enable ChaosSearch.'
+                   'Must be specified if "--chaos-search" is provided.')
+@click.option('--chaos-search-region',
+              help='Region for chaossearch. '
+                   'Must be specified if "--chaos-search" is provided.')
+@click.option('--chaos-search-access-key-id',
+              help='AWS Access Key. '
+                   'Must be specified if "--chaos-search" is provided.')
+@click.option('--chaos-search-secret-access-key',
+              help='AWS Access Key. '
+                   'Must be specified if "--chaos-search" is provided.')
 @click.option('--json-logging', '-j', default=False, is_flag=True,
               help='Turn on json logging.')
 @click.option('--log-level', default='INFO',
-              type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']),
+              type=click.Choice(
+                  ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']),
               help='Detail level to log. (default: INFO)')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Turn on verbose (DEBUG) logging. Overrides --log-level.')
@@ -461,26 +486,40 @@ CONFIGPARSER_CONVERTERS = {
 def cli(**options):
     """Export Elasticsearch query results to Prometheus."""
     if options['basic_user'] and options['basic_password'] is None:
-        click.BadOptionUsage('basic_user', 'Username provided with no password.')
+        click.BadOptionUsage(
+            'basic_user', 'Username provided with no password.')
     elif options['basic_user'] is None and options['basic_password']:
-        click.BadOptionUsage('basic_password', 'Password provided with no username.')
+        click.BadOptionUsage(
+            'basic_password', 'Password provided with no username.')
     elif options['basic_user']:
         http_auth = (options['basic_user'], options['basic_password'])
     else:
         http_auth = None
 
+    if options['chaos_search']:
+        awsauth = AWS4Auth(options['chaos_search_access_key_id'],
+                           options['chaos_search_secret_access_key'], options['chaos_search_region'], 's3')
+        http_auth = awsauth
+    else:
+        http_auth = None
+
     if not options['ca_certs'] and options['client_cert']:
-        click.BadOptionUsage('client_cert', '--client-cert can only be used when --ca-certs is provided.')
+        click.BadOptionUsage(
+            'client_cert', '--client-cert can only be used when --ca-certs is provided.')
     elif not options['ca_certs'] and options['client_key']:
-        click.BadOptionUsage('client_key', '--client-key can only be used when --ca-certs is provided.')
+        click.BadOptionUsage(
+            'client_key', '--client-key can only be used when --ca-certs is provided.')
     elif options['client_cert'] and not options['client_key']:
-        click.BadOptionUsage('client_cert', '--client-key must be provided when --client-cert is used.')
+        click.BadOptionUsage(
+            'client_cert', '--client-key must be provided when --client-cert is used.')
     elif not options['client_cert'] and options['client_key']:
-        click.BadOptionUsage('client_key', '--client-cert must be provided when --client-key is used.')
+        click.BadOptionUsage(
+            'client_key', '--client-cert must be provided when --client-key is used.')
 
     log_handler = logging.StreamHandler()
     log_format = '[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s'
-    formatter = JogFormatter(log_format) if options['json_logging'] else logging.Formatter(log_format)
+    formatter = JogFormatter(
+        log_format) if options['json_logging'] else logging.Formatter(log_format)
     log_handler.setFormatter(formatter)
 
     log_level = getattr(logging, options['log_level'])
@@ -500,6 +539,15 @@ def cli(**options):
                                   client_cert=options['client_cert'],
                                   client_key=options['client_key'],
                                   http_auth=http_auth)
+    if options['chaos_search']:
+        es_client = Elasticsearch(
+            hosts=[{'host': options['chaos_search'], 'port': 443,
+                    'url_prefix': '/elastic', 'use_ssl': True}],
+            http_auth=awsauth,
+            connection_class=RequestsHttpConnection,
+            verify_certs=True
+        )
+
     else:
         es_client = Elasticsearch(es_cluster,
                                   verify_certs=False,

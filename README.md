@@ -11,6 +11,12 @@ Values are parsed out of the Elasticsearch results automatically, with the path 
 
 Metrics are only extracted from aggregation results, with the exception of the query `hits.total` count (exposed as `hits`) and `took` time (exposed as `took_milliseconds`). The keys of any buckets are converted to labels, rather than being inserted into the metric name.
 
+### Query Metrics from ChaosSearch
+ChaosSearch is a managed Elastic Search cluster. Here is an example for configuring the exporter for generating prometheus metrics on search queries. 
+`--chaos-search=eu-poc-trial.chaossearch.io --chaos-search-region=eu-west-1 --chaos-search-access-key-id=ACCESS_KEY_HERE --chaos-search-secret-access-key=ACCESS_SECRET_HERE --nodes-stats-disable --cluster-health-disable --indices-aliases-disable --indices-mappings-disable`
+
+Note: Ensure the `exporter.cfg` has the `QueryIndices` set for every search. Also, ensure all Elasticsearch related metrics are disabled as this is not exposed.
+
 ### Supported Aggregations
 A limited set of aggregations are explicitly supported with tests. See [tests/test_parser.py](tests/test_parser.py) for example queries using these aggregations, and the metrics they produce. Most other aggregations should also work, so long as their result format is similar in structure to one of the explicitly supported aggregations.
 

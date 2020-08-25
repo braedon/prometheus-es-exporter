@@ -37,6 +37,7 @@ setup(
         'elasticsearch',
         'jog',
         'prometheus-client >= 0.6.0',
+        'requests_aws4auth',
     ],
     entry_points={
         'console_scripts': [
