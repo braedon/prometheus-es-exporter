@@ -461,22 +461,26 @@ CONFIGPARSER_CONVERTERS = {
 def cli(**options):
     """Export Elasticsearch query results to Prometheus."""
     if options['basic_user'] and options['basic_password'] is None:
-        click.BadOptionUsage('basic_user', 'Username provided with no password.')
+        raise click.BadOptionUsage('basic_user', 'Username provided with no password.')
     elif options['basic_user'] is None and options['basic_password']:
-        click.BadOptionUsage('basic_password', 'Password provided with no username.')
+        raise click.BadOptionUsage('basic_password', 'Password provided with no username.')
     elif options['basic_user']:
         http_auth = (options['basic_user'], options['basic_password'])
     else:
         http_auth = None
 
     if not options['ca_certs'] and options['client_cert']:
-        click.BadOptionUsage('client_cert', '--client-cert can only be used when --ca-certs is provided.')
+        raise click.BadOptionUsage('client_cert',
+                                   '--client-cert can only be used when --ca-certs is provided.')
     elif not options['ca_certs'] and options['client_key']:
-        click.BadOptionUsage('client_key', '--client-key can only be used when --ca-certs is provided.')
+        raise click.BadOptionUsage('client_key',
+                                   '--client-key can only be used when --ca-certs is provided.')
     elif options['client_cert'] and not options['client_key']:
-        click.BadOptionUsage('client_cert', '--client-key must be provided when --client-cert is used.')
+        raise click.BadOptionUsage('client_cert',
+                                   '--client-key must be provided when --client-cert is used.')
     elif not options['client_cert'] and options['client_key']:
-        click.BadOptionUsage('client_key', '--client-cert must be provided when --client-key is used.')
+        raise click.BadOptionUsage('client_key',
+                                   '--client-cert must be provided when --client-key is used.')
 
     log_handler = logging.StreamHandler()
     log_format = '[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s'
