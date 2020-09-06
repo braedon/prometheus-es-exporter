@@ -151,21 +151,28 @@ class IndicesMappingsCollector(object):
 
 
 class IndicesStatsCollector(object):
-    def __init__(self, es_client, timeout, parse_indices=False, metrics=None, fields=None):
+    def __init__(self, es_client, timeout, parse_indices=False,
+                 indices=None, metrics=None, fields=None):
         self.metric_name_list = ['es', 'indices_stats']
         self.description = 'Indices Stats'
 
         self.es_client = es_client
         self.timeout = timeout
         self.parse_indices = parse_indices
+        self.indices = indices
         self.metrics = metrics
         self.fields = fields
 
     def collect(self):
         try:
-            response = self.es_client.indices.stats(metric=self.metrics, fields=self.fields, request_timeout=self.timeout)
+            response = self.es_client.indices.stats(index=self.indices,
+                                                    metric=self.metrics,
+                                                    fields=self.fields,
+                                                    request_timeout=self.timeout)
 
-            metrics = indices_stats_parser.parse_response(response, self.parse_indices, self.metric_name_list)
+            metrics = indices_stats_parser.parse_response(response,
+                                                          self.parse_indices,
+                                                          self.metric_name_list)
             metric_dict = group_metrics(metrics)
         except ConnectionTimeout:
             log.warning('Timeout while fetching %(description)s (timeout %(timeout_s)ss).',
@@ -339,6 +346,16 @@ INDICES_STATS_METRICS_OPTIONS = [
 ]
 
 
+def indices_stats_indices_parser(ctx, param, value):
+    if value is None:
+        return None
+
+    if value in ('*', '_all', ''):
+        return value
+    else:
+        return value.split(',')
+
+
 def indices_stats_fields_parser(ctx, param, value):
     if value is None:
         return None
@@ -441,6 +458,11 @@ CONFIGPARSER_CONVERTERS = {
 @click.option('--indices-stats-mode', default='cluster',
               type=click.Choice(['cluster', 'indices']),
               help='Detail mode for indices stats monitoring. (default: cluster)')
+@click.option('--indices-stats-indices',
+              callback=indices_stats_indices_parser,
+              help='Limit indices stats to specific indices. '
+                   'Only takes effect if "--indices-stats-mode=indices". '
+                   'Indices should be separated by commas e.g. index1,index2.')
 @click.option('--indices-stats-metrics',
               type=MultiChoice(INDICES_STATS_METRICS_OPTIONS),
               help='Limit indices stats to specific metrics. '
@@ -448,7 +470,7 @@ CONFIGPARSER_CONVERTERS = {
 @click.option('--indices-stats-fields',
               callback=indices_stats_fields_parser,
               help='Include fielddata info for specific fields. '
-                   'Fields should be separated by commas e.g. indices,fs. '
+                   'Fields should be separated by commas e.g. field1,field2. '
                    'Use \'*\' for all.')
 @click.option('--json-logging', '-j', default=False, is_flag=True,
               help='Turn on json logging.')
@@ -481,6 +503,11 @@ def cli(**options):
     elif not options['client_cert'] and options['client_key']:
         raise click.BadOptionUsage('client_key',
                                    '--client-cert must be provided when --client-key is used.')
+
+    if options['indices_stats_indices'] and options['indices_stats_mode'] != 'indices':
+        raise click.BadOptionUsage('indices_stats_indices',
+                                   '--indices-stats-mode must be "indices" for '
+                                   '--indices-stats-indices to be used.')
 
     log_handler = logging.StreamHandler()
     log_format = '[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s'
@@ -574,6 +601,7 @@ def cli(**options):
         REGISTRY.register(IndicesStatsCollector(es_client,
                                                 options['indices_stats_timeout'],
                                                 parse_indices=parse_indices,
+                                                indices=options['indices_stats_indices'],
                                                 metrics=options['indices_stats_metrics'],
                                                 fields=options['indices_stats_fields']))
 
