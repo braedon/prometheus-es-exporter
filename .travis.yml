@@ -13,7 +13,7 @@ script:
 jobs:
   include:
     - stage: deploy
-      if: branch = master AND tag IS present
+      if: tag IS present
       python: 3.8
       script: skip
       deploy:
@@ -24,4 +24,3 @@ jobs:
         distributions: "sdist bdist_wheel"
         on:
           tags: true
-          branch: master
