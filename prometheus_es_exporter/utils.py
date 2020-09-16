@@ -52,7 +52,8 @@ def log_exceptions(exit_on_exception=False):
     return decorator
 
 
-def nice_shutdown(shutdown_signals=(signal.SIGINT, signal.SIGTERM)):
+def nice_shutdown(executor=None,
+                  shutdown_signals=(signal.SIGINT, signal.SIGTERM)):
     """
     Logs shutdown signals nicely.
 
@@ -64,6 +65,9 @@ def nice_shutdown(shutdown_signals=(signal.SIGINT, signal.SIGTERM)):
     def sig_handler(signum, _):
         log.info('Received signal %(signal)s.',
                  {'signal': signal.Signals(signum).name})
+        # Finish ThreadPoolExecutor execution cleanly, if using threading.
+        if executor != None:
+            executor.shutdown()
         # Raise SystemExit to bypass (most) try/except blocks.
         sys.exit()
 
