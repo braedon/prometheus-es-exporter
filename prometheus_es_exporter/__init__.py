@@ -7,6 +7,8 @@ import logging
 import os
 import sched
 import time
+import concurrent.futures
+import threading
 
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConnectionTimeout
@@ -32,7 +34,7 @@ CONTEXT_SETTINGS = {
 }
 
 METRICS_BY_QUERY = {}
-
+METRICS_BY_QUERY_LOCK = threading.Lock()
 
 def collector_up_gauge(name_list, description, succeeded=True):
     metric_name = format_metric_name(*name_list, 'up')
@@ -194,7 +196,9 @@ class QueryMetricCollector(object):
         # as it may be updated by other threads.
         # (only first level - lower levels are replaced
         # wholesale, so don't worry about them)
+        METRICS_BY_QUERY_LOCK.acquire()
         query_metrics = METRICS_BY_QUERY.copy()
+        METRICS_BY_QUERY_LOCK.release()
         for metric_dict in query_metrics.values():
             yield from gauge_generator(metric_dict)
 
@@ -214,6 +218,7 @@ def run_query(es_client, query_name, indices, query,
 
         # If this query has successfully run before, we need to handle any
         # metrics produced by that previous run.
+        METRICS_BY_QUERY_LOCK.acquire()
         if query_name in METRICS_BY_QUERY:
             old_metric_dict = METRICS_BY_QUERY[query_name]
 
@@ -231,10 +236,12 @@ def run_query(es_client, query_name, indices, query,
                                                  zero_missing=True)
 
             METRICS_BY_QUERY[query_name] = metric_dict
+        METRICS_BY_QUERY_LOCK.release()
 
     else:
         # If this query has successfully run before, we need to handle any
         # missing metrics.
+        METRICS_BY_QUERY_LOCK.acquire()
         if query_name in METRICS_BY_QUERY:
             old_metric_dict = METRICS_BY_QUERY[query_name]
 
@@ -250,6 +257,7 @@ def run_query(es_client, query_name, indices, query,
                                                  zero_missing=True)
 
         METRICS_BY_QUERY[query_name] = metric_dict
+        METRICS_BY_QUERY_LOCK.release()
 
 
 # Based on click.Choice
@@ -428,6 +436,8 @@ CONFIGPARSER_CONVERTERS = {
                    'in filename order. '
                    'Can be absolute, or relative to the current working directory. '
                    '(default: ./config)')
+@click.option('--threads',
+              help='Enables concurrent query execution using the number of threads specified. If the number of threads is less than 1, throws an error.')
 @click.option('--cluster-health-disable', default=False, is_flag=True,
               help='Disable cluster health monitoring.')
 @click.option('--cluster-health-timeout', default=10.0,
@@ -509,6 +519,14 @@ def cli(**options):
                                    '--indices-stats-mode must be "indices" for '
                                    '--indices-stats-indices to be used.')
 
+    executor = None
+    if options['threads']:
+        num_threads = int(options['threads'])
+        if num_threads < 1:
+            raise click.BadOptionUsage('threads',
+                                       '--threads must specify a number of threads greater than 0.')
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=num_threads)
+
     log_handler = logging.StreamHandler()
     log_format = '[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s'
     formatter = JogFormatter(log_format) if options['json_logging'] else logging.Formatter(log_format)
@@ -571,7 +589,7 @@ def cli(**options):
         if queries:
             for query_name, (interval, timeout, indices, query,
                              on_error, on_missing) in queries.items():
-                schedule_job(scheduler, interval,
+                schedule_job(scheduler, executor, interval,
                              run_query, es_client, query_name, indices, query,
                              timeout, on_error, on_missing)
         else:
