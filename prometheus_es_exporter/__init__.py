@@ -436,8 +436,9 @@ CONFIGPARSER_CONVERTERS = {
                    'in filename order. '
                    'Can be absolute, or relative to the current working directory. '
                    '(default: ./config)')
-@click.option('--threads',
-              help='Enables concurrent query execution using the number of threads specified. If the number of threads is less than 1, throws an error.')
+@click.option('--threads', type=click.IntRange(min=1), default=1,
+              help='Enables concurrent query execution using the number of threads specified. '
+                   '(default: 1))
 @click.option('--cluster-health-disable', default=False, is_flag=True,
               help='Disable cluster health monitoring.')
 @click.option('--cluster-health-timeout', default=10.0,
