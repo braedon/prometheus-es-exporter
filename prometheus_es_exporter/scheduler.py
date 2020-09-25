@@ -18,8 +18,8 @@ def schedule_job(scheduler, executor, interval, func, *args, **kwargs):
             except Exception:
                 log.exception('Error while running scheduled job.')
 
-        if executor != None:
-            executor.submit(lambda *args, **kwargs: run_func(func, *args, **kwargs), *args, **kwargs)
+        if executor is not None:
+            executor.submit(run_func, func, *args, **kwargs)
         else:
             run_func(func, *args, **kwargs)
 
