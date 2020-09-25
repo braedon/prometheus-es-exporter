@@ -438,7 +438,7 @@ CONFIGPARSER_CONVERTERS = {
                    '(default: ./config)')
 @click.option('--threads', type=click.IntRange(min=1), default=1,
               help='Enables concurrent query execution using the number of threads specified. '
-                   '(default: 1))
+                   '(default: 1)')
 @click.option('--cluster-health-disable', default=False, is_flag=True,
               help='Disable cluster health monitoring.')
 @click.option('--cluster-health-timeout', default=10.0,
