@@ -521,11 +521,8 @@ def cli(**options):
                                    '--indices-stats-indices to be used.')
 
     executor = None
-    if options['threads']:
-        num_threads = int(options['threads'])
-        if num_threads < 1:
-            raise click.BadOptionUsage('threads',
-                                       '--threads must specify a number of threads greater than 0.')
+    num_threads = options['threads']
+    if num_threads > 1:
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=num_threads)
 
     log_handler = logging.StreamHandler()
