@@ -34,7 +34,6 @@ CONTEXT_SETTINGS = {
 }
 
 METRICS_BY_QUERY = {}
-METRICS_BY_QUERY_LOCK = threading.Lock()
 
 def collector_up_gauge(name_list, description, succeeded=True):
     metric_name = format_metric_name(*name_list, 'up')
@@ -196,9 +195,7 @@ class QueryMetricCollector(object):
         # as it may be updated by other threads.
         # (only first level - lower levels are replaced
         # wholesale, so don't worry about them)
-        METRICS_BY_QUERY_LOCK.acquire()
         query_metrics = METRICS_BY_QUERY.copy()
-        METRICS_BY_QUERY_LOCK.release()
         for metric_dict in query_metrics.values():
             yield from gauge_generator(metric_dict)
 
@@ -218,7 +215,6 @@ def run_query(es_client, query_name, indices, query,
 
         # If this query has successfully run before, we need to handle any
         # metrics produced by that previous run.
-        METRICS_BY_QUERY_LOCK.acquire()
         if query_name in METRICS_BY_QUERY:
             old_metric_dict = METRICS_BY_QUERY[query_name]
 
@@ -236,12 +232,10 @@ def run_query(es_client, query_name, indices, query,
                                                  zero_missing=True)
 
             METRICS_BY_QUERY[query_name] = metric_dict
-        METRICS_BY_QUERY_LOCK.release()
 
     else:
         # If this query has successfully run before, we need to handle any
         # missing metrics.
-        METRICS_BY_QUERY_LOCK.acquire()
         if query_name in METRICS_BY_QUERY:
             old_metric_dict = METRICS_BY_QUERY[query_name]
 
@@ -257,7 +251,6 @@ def run_query(es_client, query_name, indices, query,
                                                  zero_missing=True)
 
         METRICS_BY_QUERY[query_name] = metric_dict
-        METRICS_BY_QUERY_LOCK.release()
 
 
 # Based on click.Choice
