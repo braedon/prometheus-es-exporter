@@ -4,7 +4,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def schedule_job(scheduler, interval, func, *args, **kwargs):
+def schedule_job(scheduler, executor, interval, func, *args, **kwargs):
     """
     Schedule a function to be run on a fixed interval.
 
@@ -12,10 +12,16 @@ def schedule_job(scheduler, interval, func, *args, **kwargs):
     """
 
     def scheduled_run(scheduled_time, *args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except Exception:
-            log.exception('Error while running scheduled job.')
+        def run_func(func, *args, **kwargs):
+            try:
+                func(*args, **kwargs)
+            except Exception:
+                log.exception('Error while running scheduled job.')
+
+        if executor is not None:
+            executor.submit(run_func, func, *args, **kwargs)
+        else:
+            run_func(func, *args, **kwargs)
 
         current_time = time.monotonic()
         next_scheduled_time = scheduled_time + interval

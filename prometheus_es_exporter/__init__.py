@@ -1,5 +1,6 @@
 import click
 import click_config_file
+import concurrent.futures
 import configparser
 import glob
 import json
@@ -428,6 +429,9 @@ CONFIGPARSER_CONVERTERS = {
                    'in filename order. '
                    'Can be absolute, or relative to the current working directory. '
                    '(default: ./config)')
+@click.option('--threads', type=click.IntRange(min=1), default=1,
+              help='Enables concurrent query execution using the number of threads specified. '
+                   '(default: 1)')
 @click.option('--cluster-health-disable', default=False, is_flag=True,
               help='Disable cluster health monitoring.')
 @click.option('--cluster-health-timeout', default=10.0,
@@ -509,6 +513,11 @@ def cli(**options):
                                    '--indices-stats-mode must be "indices" for '
                                    '--indices-stats-indices to be used.')
 
+    executor = None
+    num_threads = options['threads']
+    if num_threads > 1:
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=num_threads)
+
     log_handler = logging.StreamHandler()
     log_format = '[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s'
     formatter = JogFormatter(log_format) if options['json_logging'] else logging.Formatter(log_format)
@@ -571,7 +580,7 @@ def cli(**options):
         if queries:
             for query_name, (interval, timeout, indices, query,
                              on_error, on_missing) in queries.items():
-                schedule_job(scheduler, interval,
+                schedule_job(scheduler, executor, interval,
                              run_query, es_client, query_name, indices, query,
                              timeout, on_error, on_missing)
         else:
