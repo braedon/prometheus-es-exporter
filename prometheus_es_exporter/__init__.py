@@ -366,6 +366,23 @@ def indices_stats_fields_parser(ctx, param, value):
         return value.split(',')
 
 
+def split_http_header(header_string):
+    """Splits a colon-separated string into header and value"""
+    parts = tuple(part.strip() for part in header_string.split(":", 1))
+    if len(parts) != 2 or any(part == '' for part in parts):
+        msg = "Invalid header '{}'. Use colon to separate name and value".format(header_string)
+        raise click.BadParameter(msg)
+    return parts
+
+
+def http_headers_parser(ctx, param, headers):
+    """Turn header list into a dict {header: value, ...}"""
+    if headers is None:
+        return None
+
+    return dict(split_http_header(header_string) for header_string in headers)
+
+
 def configparser_enum_conv(enum):
     lower_enums = tuple(e.lower() for e in enum)
 
@@ -413,6 +430,7 @@ CONFIGPARSER_CONVERTERS = {
                    'Must be specified if "--basic-user" is provided.')
 @click.option('--header', '-H',
               multiple=True,
+              callback=http_headers_parser,
               help='HTTP header to include in requests to ElasticSearch cluster. '
                    'Header name and value should be separated by colon, e.g. '
                    '"Authorization: Bearer xxxxx". Several headers can be added '
@@ -515,18 +533,6 @@ def cli(**options):
                                    '--indices-stats-mode must be "indices" for '
                                    '--indices-stats-indices to be used.')
 
-    if options['header']:
-        def parse_header(header):
-            """Split header into name and value"""
-            parts = tuple(part.strip() for part in header.split(":", 1))
-            if len(parts) != 2 or any(part == '' for part in parts):
-                raise click.BadOptionUsage('header',
-                                           'Invalid header "%s". Use colon to separate name and value.' % header)
-            return parts
-        headers = dict(parse_header(h) for h in options['header'])
-    else:
-        headers = None
-
     log_handler = logging.StreamHandler()
     log_format = '[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s'
     formatter = JogFormatter(log_format) if options['json_logging'] else logging.Formatter(log_format)
@@ -548,13 +554,13 @@ def cli(**options):
                                   ca_certs=options['ca_certs'],
                                   client_cert=options['client_cert'],
                                   client_key=options['client_key'],
-                                  http_auth=http_auth,
-                                  headers=headers)
+                                  headers=options['header'],
+                                  http_auth=http_auth)
     else:
         es_client = Elasticsearch(es_cluster,
                                   verify_certs=False,
-                                  http_auth=http_auth,
-                                  headers=headers)
+                                  headers=options['header'],
+                                  http_auth=http_auth)
 
     scheduler = None
 
