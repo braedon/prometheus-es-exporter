@@ -411,6 +411,12 @@ CONFIGPARSER_CONVERTERS = {
 @click.option('--basic-password',
               help='Password for basic authentication with nodes. '
                    'Must be specified if "--basic-user" is provided.')
+@click.option('--header', '-H',
+              multiple=True,
+              help='HTTP header to include in requests to ElasticSearch cluster. '
+                   'Header name and value should be separated by colon, e.g. '
+                   '"Authorization: Bearer xxxxx". Several headers can be added '
+                   'by repeating the -H parameter.')
 @click.option('--port', '-p', default=9206,
               help='Port to serve the metrics endpoint on. (default: 9206)')
 @click.option('--query-disable', default=False, is_flag=True,
@@ -509,6 +515,18 @@ def cli(**options):
                                    '--indices-stats-mode must be "indices" for '
                                    '--indices-stats-indices to be used.')
 
+    if options['header']:
+        def parse_header(header):
+            """Split header into name and value"""
+            parts = tuple(part.strip() for part in header.split(":", 1))
+            if len(parts) != 2 or any(part == '' for part in parts):
+                raise click.BadOptionUsage('header',
+                                           'Invalid header "%s". Use colon to separate name and value.' % header)
+            return parts
+        headers = dict(parse_header(h) for h in options['header'])
+    else:
+        headers = None
+
     log_handler = logging.StreamHandler()
     log_format = '[%(asctime)s] %(name)s.%(levelname)s %(threadName)s %(message)s'
     formatter = JogFormatter(log_format) if options['json_logging'] else logging.Formatter(log_format)
@@ -530,11 +548,13 @@ def cli(**options):
                                   ca_certs=options['ca_certs'],
                                   client_cert=options['client_cert'],
                                   client_key=options['client_key'],
-                                  http_auth=http_auth)
+                                  http_auth=http_auth,
+                                  headers=headers)
     else:
         es_client = Elasticsearch(es_cluster,
                                   verify_certs=False,
-                                  http_auth=http_auth)
+                                  http_auth=http_auth,
+                                  headers=headers)
 
     scheduler = None
 
