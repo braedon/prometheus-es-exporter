@@ -367,6 +367,23 @@ def indices_stats_fields_parser(ctx, param, value):
         return value.split(',')
 
 
+def split_http_header(header_string):
+    """Splits a colon-separated string into header and value"""
+    parts = tuple(part.strip() for part in header_string.split(":", 1))
+    if len(parts) != 2 or any(part == '' for part in parts):
+        msg = "Invalid header '{}'. Use colon to separate name and value".format(header_string)
+        raise click.BadParameter(msg)
+    return parts
+
+
+def http_headers_parser(ctx, param, headers):
+    """Turn header list into a dict {header: value, ...}"""
+    if headers is None:
+        return None
+
+    return dict(split_http_header(header_string) for header_string in headers)
+
+
 def configparser_enum_conv(enum):
     lower_enums = tuple(e.lower() for e in enum)
 
@@ -412,6 +429,13 @@ CONFIGPARSER_CONVERTERS = {
 @click.option('--basic-password',
               help='Password for basic authentication with nodes. '
                    'Must be specified if "--basic-user" is provided.')
+@click.option('--header', '-H',
+              multiple=True,
+              callback=http_headers_parser,
+              help='HTTP header to include in requests to ElasticSearch cluster. '
+                   'Header name and value should be separated by colon, e.g. '
+                   '"Authorization: Bearer xxxxx". Several headers can be added '
+                   'by repeating the -H parameter.')
 @click.option('--port', '-p', default=9206,
               help='Port to serve the metrics endpoint on. (default: 9206)')
 @click.option('--query-disable', default=False, is_flag=True,
@@ -539,10 +563,12 @@ def cli(**options):
                                   ca_certs=options['ca_certs'],
                                   client_cert=options['client_cert'],
                                   client_key=options['client_key'],
+                                  headers=options['header'],
                                   http_auth=http_auth)
     else:
         es_client = Elasticsearch(es_cluster,
                                   verify_certs=False,
+                                  headers=options['header'],
                                   http_auth=http_auth)
 
     scheduler = None
