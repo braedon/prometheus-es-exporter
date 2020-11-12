@@ -52,6 +52,10 @@ def parse_index(index, mappings, metric=None):
     else:
         counts = {}
         for mapping_type, type_mappings in mappings.items():
+            if mapping_type == '_default_':
+                # Skip the default mapping type - it's a template used for new mapping types, not an
+                # actual type itself.
+                continue
             counts = count_object_fields(type_mappings, counts=counts)
 
     metrics = []
