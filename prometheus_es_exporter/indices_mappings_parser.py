@@ -47,12 +47,28 @@ def parse_index(index, mappings, metric=None):
     if 'properties' in mappings:
         counts = count_object_fields(mappings)
 
-    # Older Elasticsearch versions had the concept of mapping types, so the root maps from mapping
-    # type to the object mappings for that type. We have to count the fields the types separately.
-    else:
+    # No properties defined, so this could be a pre ES7 Elasticsearch instance.
+    # Before ES7, Elasticsearch had the concept of mapping types, so the mapping root maps from the
+    # mapping type to the object mappings for the type.
+    #
+    # However, this could also be ES7+, and the index just doesn't have any properties mapped yet.
+    #
+    # If any value is an dict with properties, we know it's pre ES7, and we have to count the
+    # fields of the types separately.
+    elif any(isinstance(value, dict) and 'properties' in value for value in mappings.values()):
         counts = {}
         for mapping_type, type_mappings in mappings.items():
+            if mapping_type == '_default_':
+                # Skip the default mapping type - it's a template used for new mapping types, not an
+                # actual type itself.
+                continue
+            if 'properties' not in type_mappings:
+                # Skip any empty mapping types that don't have any properties.
+                continue
             counts = count_object_fields(type_mappings, counts=counts)
+
+    else:
+        counts = {}
 
     metrics = []
     for field_type, count in counts.items():
