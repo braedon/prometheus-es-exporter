@@ -841,6 +841,101 @@ class Test(unittest.TestCase):
         result = convert_result(parse_response(response))
         self.assertEqual(expected, result)
 
+    def test_composite(self):
+        # Query:
+        # {
+        #     "size": 0,
+        #     "query": {
+        #         "match_all": {}
+        #     },
+        #     "aggs": {
+        #         "group_comp": {
+        #             "composite": {
+        #                 "sources": [
+        #                     {"group1": {"terms": {"field": "group1.keyword"}}},
+        #                     {"val": {"terms": {"field": "val"}}}
+        #                 ]
+        #             },
+        #             "aggs": {
+        #                 "val_sum": {
+        #                     "sum": {"field": "val"}
+        #                 }
+        #             }
+        #         }
+        #     }
+        # }
+        response = {
+            "_shards": {
+                "total": 1,
+                "successful": 1,
+                "skipped": 0,
+                "failed": 0
+            },
+            "aggregations": {
+                "group_comp": {
+                    "after_key": {
+                        "group1": "b",
+                        "val": 3
+                    },
+                    "buckets": [
+                        {
+                            "doc_count": 1,
+                            "key": {
+                                "group1": "a",
+                                "val": 1
+                            },
+                            "val_sum": {
+                                "value": 1
+                            }
+                        },
+                        {
+                            "doc_count": 1,
+                            "key": {
+                                "group1": "a",
+                                "val": 2
+                            },
+                            "val_sum": {
+                                "value": 2
+                            }
+                        },
+                        {
+                            "doc_count": 1,
+                            "key": {
+                                "group1": "b",
+                                "val": 3
+                            },
+                            "val_sum": {
+                                "value": 3
+                            }
+                        }
+                    ]
+                }
+            },
+            "hits": {
+                "hits": [],
+                "max_score": None,
+                "total": {
+                    "relation": "eq",
+                    "value": 3
+                }
+            },
+            "timed_out": False,
+            "took": 3
+        }
+
+        expected = {
+            'hits': 3,
+            'took_milliseconds': 3,
+            'group_comp_doc_count{group_comp_group1="a",group_comp_val="1"}': 1,
+            'group_comp_val_sum_value{group_comp_group1="a",group_comp_val="1"}': 1,
+            'group_comp_doc_count{group_comp_group1="a",group_comp_val="2"}': 1,
+            'group_comp_val_sum_value{group_comp_group1="a",group_comp_val="2"}': 2,
+            'group_comp_doc_count{group_comp_group1="b",group_comp_val="3"}': 1,
+            'group_comp_val_sum_value{group_comp_group1="b",group_comp_val="3"}': 3,
+        }
+        result = convert_result(parse_response(response))
+        self.assertEqual(expected, result)
+
     # Tests handling of disallowed characters in labels and metric names
     # The '-'s in the aggregation name aren't allowed in metric names or
     # label keys, so need to be substituted.

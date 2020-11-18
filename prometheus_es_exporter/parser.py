@@ -3,6 +3,17 @@ from collections import OrderedDict
 from .metrics import format_metric_name, format_labels
 
 
+def add_label(label_key, label_value, labels):
+    labels = labels.copy()
+
+    if label_key in labels.keys():
+        labels[label_key] = labels[label_key] + [label_value]
+    else:
+        labels[label_key] = [label_value]
+
+    return labels
+
+
 def parse_buckets(agg_key, buckets, metric=None, labels=None):
     if metric is None:
         metric = []
@@ -12,23 +23,26 @@ def parse_buckets(agg_key, buckets, metric=None, labels=None):
     result = []
 
     for index, bucket in enumerate(buckets):
-        labels_next = labels.copy()
+        labels_nest = labels.copy()
 
         if 'key' in bucket.keys():
-            bucket_key = str(bucket['key'])
-            if agg_key in labels_next.keys():
-                labels_next[agg_key] = labels_next[agg_key] + [bucket_key]
+            # Keys for composite aggregation buckets are dicts with multiple key/value pairs.
+            if isinstance(bucket['key'], dict):
+                for comp_key, comp_value in bucket['key'].items():
+                    label_key = '_'.join([agg_key, comp_key])
+                    labels_nest = add_label(label_key, str(comp_value), labels_nest)
+
             else:
-                labels_next[agg_key] = [bucket_key]
+                labels_nest = add_label(agg_key, str(bucket['key']), labels_nest)
+
+            # Delete the key so it isn't parsed for metrics.
             del bucket['key']
+
         else:
             bucket_key = 'filter_' + str(index)
-            if agg_key in labels_next.keys():
-                labels_next[agg_key] = labels_next[agg_key] + [bucket_key]
-            else:
-                labels_next[agg_key] = [bucket_key]
+            labels_nest = add_label(agg_key, bucket_key, labels_nest)
 
-        result.extend(parse_agg(bucket_key, bucket, metric=metric, labels=labels_next))
+        result.extend(parse_agg(agg_key, bucket, metric=metric, labels=labels_nest))
 
     return result
 
@@ -42,14 +56,9 @@ def parse_buckets_fixed(agg_key, buckets, metric=None, labels=None):
     result = []
 
     for bucket_key, bucket in buckets.items():
-        labels_next = labels.copy()
-
-        if agg_key in labels_next.keys():
-            labels_next[agg_key] = labels_next[agg_key] + [bucket_key]
-        else:
-            labels_next[agg_key] = [bucket_key]
-
-        result.extend(parse_agg(bucket_key, bucket, metric=metric, labels=labels_next))
+        labels_nest = labels.copy()
+        labels_next = add_label(agg_key, bucket_key, labels_nest)
+        result.extend(parse_agg(agg_key, bucket, metric=metric, labels=labels_next))
 
     return result
 
@@ -67,6 +76,10 @@ def parse_agg(agg_key, agg, metric=None, labels=None):
             result.extend(parse_buckets(agg_key, value, metric=metric, labels=labels))
         elif key == 'buckets' and isinstance(value, dict):
             result.extend(parse_buckets_fixed(agg_key, value, metric=metric, labels=labels))
+        elif key == 'after_key' and 'buckets' in agg:
+            # `after_key` is used for paging composite aggregations - don't parse for metrics.
+            # https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-bucket-composite-aggregation.html#_pagination
+            continue
         elif isinstance(value, dict):
             result.extend(parse_agg(key, value, metric=metric + [key], labels=labels))
         # We only want numbers as metrics.
