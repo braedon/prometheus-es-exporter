@@ -577,7 +577,7 @@ class Test(unittest.TestCase):
         #     },
         #     "aggs": {
         #         "group1_term": {
-        #             "terms": {"field": "group1"},
+        #             "terms": {"field": "group1.keyword"},
         #             "aggs": {
         #                 "val_sum": {
         #                     "sum": {"field": "val"}
@@ -728,13 +728,13 @@ class Test(unittest.TestCase):
         #     },
         #     "aggs": {
         #         "group1_term": {
-        #             "terms": {"field": "group1"},
+        #             "terms": {"field": "group1.keyword"},
         #             "aggs": {
         #                 "val_sum": {
         #                     "sum": {"field": "val"}
         #                 },
         #                 "group2_term": {
-        #                     "terms": {"field": "group2"},
+        #                     "terms": {"field": "group2.keyword"},
         #                     "aggs": {
         #                         "val_sum": {
         #                             "sum": {"field": "val"}
