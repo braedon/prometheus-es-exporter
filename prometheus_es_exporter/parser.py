@@ -91,7 +91,7 @@ def parse_agg(agg_key, agg, metric=None, labels=None):
     return result
 
 
-def parse_response(response, metric=None):
+def parse_response(response, fields, metric=None):
     if metric is None:
         metric = []
 

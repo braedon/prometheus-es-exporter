@@ -200,13 +200,13 @@ class QueryMetricCollector(object):
             yield from gauge_generator(metric_dict)
 
 
-def run_query(es_client, query_name, indices, query,
+def run_query(es_client, query_name, indices, query, fields,
               timeout, on_error, on_missing):
 
     try:
         response = es_client.search(index=indices, body=query, request_timeout=timeout)
 
-        metrics = parse_response(response, [query_name])
+        metrics = parse_response(response, fields, [query_name])
         metric_dict = group_metrics(metrics)
 
     except Exception:
