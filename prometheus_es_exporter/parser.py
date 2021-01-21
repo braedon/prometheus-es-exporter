@@ -110,6 +110,12 @@ def parse_response(response, metric=None):
             for key, value in response['aggregations'].items():
                 metrics.extend(parse_agg(key, value, metric=metric + [key]))
 
+        if 'hits' in response.keys():
+            for hit in response['hits']['hits']:
+                label = hit['_source']['message']
+                print(label)
+                metrics.append((metric + ['hit', 'message'], 'Event driven gauge, will stay at 1 as long as event is returned from query', {'message': label}, 1))
+
     return [
         (format_metric_name(*metric_name),
          metric_doc,
