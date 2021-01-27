@@ -1,6 +1,9 @@
 from collections import OrderedDict
+import logging
 
 from .metrics import format_metric_name, format_labels
+
+log = logging.getLogger(__name__)
 
 
 def add_label(label_key, label_value, labels):
@@ -110,11 +113,26 @@ def parse_response(response, fields, metric=None):
             for key, value in response['aggregations'].items():
                 metrics.extend(parse_agg(key, value, metric=metric + [key]))
 
-        if 'hits' in response.keys():
+        if total and fields:
+
+            result = []
+            labels = OrderedDict()
+
             for hit in response['hits']['hits']:
-                label = hit['_source']['message']
-                print(label)
-                metrics.append((metric + ['hit', 'message'], 'Event driven gauge, will stay at 1 as long as event is returned from query', {'message': label}, 1))
+                for field in fields:
+                    try:
+                        label = hit['_source'][field]
+                        labels = add_label(field, label, labels)
+                    except KeyError:
+                        log.debug('Field %(field)s not present in search result',
+                                  {'field': field})
+
+                result.append(
+                    (metric + ['hit'],
+                     'Metric for single ElasticDB search result hits',
+                     labels, 1))
+
+            metrics.extend(result)
 
     return [
         (format_metric_name(*metric_name),

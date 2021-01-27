@@ -593,21 +593,23 @@ def cli(**options):
                 indices = config.get(section, 'QueryIndices',
                                      fallback='_all')
                 query = json.loads(config.get(section, 'QueryJson'))
+                fields = json.loads(config.get(section, 'LabelsFromHits',
+                                    fallback='[]'))
                 on_error = config.getenum(section, 'QueryOnError',
                                           fallback='drop')
                 on_missing = config.getenum(section, 'QueryOnMissing',
                                             fallback='drop')
 
-                queries[query_name] = (interval, timeout, indices, query,
+                queries[query_name] = (interval, timeout, indices, query, fields,
                                        on_error, on_missing)
 
         scheduler = sched.scheduler()
 
         if queries:
-            for query_name, (interval, timeout, indices, query,
+            for query_name, (interval, timeout, indices, query, fields,
                              on_error, on_missing) in queries.items():
                 schedule_job(scheduler, executor, interval,
-                             run_query, es_client, query_name, indices, query,
+                             run_query, es_client, query_name, indices, query, fields,
                              timeout, on_error, on_missing)
         else:
             log.error('No queries found in config file(s)')
