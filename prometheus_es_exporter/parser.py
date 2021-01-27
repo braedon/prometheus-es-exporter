@@ -114,6 +114,8 @@ def parse_response(response, fields, metric=None):
                 metrics.extend(parse_agg(key, value, metric=metric + [key]))
 
         if total and fields:
+            # TODO: Wrap this this in a function parse_results(hit, metric)
+            # TODO: Parse sub-objects
 
             result = []
             labels = OrderedDict()
