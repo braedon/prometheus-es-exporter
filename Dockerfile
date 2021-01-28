@@ -1,4 +1,4 @@
-FROM python:3.8-slim
+FROM keppel.eu-de-1.cloud.sap/ccloud-dockerhub-mirror/library/python:3.8-slim
 
 WORKDIR /usr/src/app
 
