@@ -94,6 +94,39 @@ def parse_agg(agg_key, agg, metric=None, labels=None):
     return result
 
 
+def parse_fields(dictionary, term_list):
+    search = term_list.pop(0)
+
+    if search not in dictionary:
+        result = False
+    elif len(term_list):
+        result = parse_fields(dictionary[search], term_list)
+    else:
+        result = dictionary[search]
+
+    return result
+
+
+def parse_hit(hit, field_names, metric):
+    labels = OrderedDict()
+
+    for field_name in field_names:
+        # Dots in field names represent nested objects
+        search = field_name.split('.')
+        result = parse_fields(hit['_source'], search)
+        if result:
+            labels = add_label(field_name, result, labels)
+        else:
+            log.debug('Field %(field)s not present in search result %(id)s',
+                      {'field': field_name,
+                       'id': hit['_id']})
+
+    return (
+        (metric,
+         'Metric for single Elastic search result hit',
+         labels, 1))
+
+
 def parse_response(response, fields, metric=None):
     if metric is None:
         metric = []
@@ -114,27 +147,8 @@ def parse_response(response, fields, metric=None):
                 metrics.extend(parse_agg(key, value, metric=metric + [key]))
 
         if total and fields:
-            # TODO: Wrap this this in a function parse_results(hit, metric)
-            # TODO: Parse sub-objects
-
-            result = []
-            labels = OrderedDict()
-
             for hit in response['hits']['hits']:
-                for field in fields:
-                    try:
-                        label = hit['_source'][field]
-                        labels = add_label(field, label, labels)
-                    except KeyError:
-                        log.debug('Field %(field)s not present in search result',
-                                  {'field': field})
-
-                result.append(
-                    (metric + ['hit'],
-                     'Metric for single ElasticDB search result hits',
-                     labels, 1))
-
-            metrics.extend(result)
+                metrics.append(parse_hit(hit, fields, metric + ['hit']))
 
     return [
         (format_metric_name(*metric_name),
