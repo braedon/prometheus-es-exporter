@@ -210,8 +210,8 @@ def run_query(es_client, query_name, indices, query, fields,
         metric_dict = group_metrics(metrics)
 
     except Exception:
-        log.exception('Error while querying indices %(indices)s, query %(query)s.',
-                      {'indices': indices, 'query': query})
+        log.exception('Error while querying indices %(indices)s, query %(query_name)s',
+                      {'indices': indices, 'query_name': query_name})
 
         # If this query has successfully run before, we need to handle any
         # metrics produced by that previous run.
