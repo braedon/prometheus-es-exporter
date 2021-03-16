@@ -60,3 +60,7 @@ target/
 
 # Gedit
 *~
+
+# Pycharm
+.idea
+venv/
