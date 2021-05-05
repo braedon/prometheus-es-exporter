@@ -94,7 +94,7 @@ If you don't want to mount the query config file in at run time, you could exten
 # Helm
 A Helm chart is available from the Helm repo at [https://braedon.github.io/helm](https://braedon.github.io/helm/).
 ```bash
-> helm repo add braedon https://braedon.github.com/helm
+> helm repo add braedon https://braedon.github.io/helm
 > helm repo update
 
 > helm install braedon/prometheus-es-exporter --name <release name> \
