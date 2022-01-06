@@ -576,14 +576,20 @@ def cli(**options):
     if not options['query_disable']:
         config = configparser.ConfigParser(converters=CONFIGPARSER_CONVERTERS)
         config.read(options['config_file'])
-
         config_dir_file_pattern = os.path.join(options['config_dir'], '*.cfg')
         config_dir_sorted_files = sorted(glob.glob(config_dir_file_pattern))
-        config.read(config_dir_sorted_files)
+        log.debug(f'Found config files: {config_dir_sorted_files}, from: {config_dir_file_pattern}')
+        for file in config_dir_sorted_files:
+            try:
+                config.read(file)
+            except configparser.ParsingError as e:
+                log.error(f'Parsing errors with file: {file}, ignoring. Exception: {e}')
+                continue
 
         query_prefix = 'query_'
         queries = {}
         for section in config.sections():
+            log.debug(f'Adding config section: {section}')
             if section.startswith(query_prefix):
                 query_name = section[len(query_prefix):]
                 interval = config.getfloat(section, 'QueryIntervalSecs',
@@ -592,7 +598,11 @@ def cli(**options):
                                           fallback=10)
                 indices = config.get(section, 'QueryIndices',
                                      fallback='_all')
-                query = json.loads(config.get(section, 'QueryJson'))
+                try:
+                    query = json.loads(config.get(section, 'QueryJson'))
+                except json.decoder.JSONDecodeError as e:
+                    log.error(f'Parsing errors with [{section}], skipping. Exception: {e}')
+                    continue
                 on_error = config.getenum(section, 'QueryOnError',
                                           fallback='drop')
                 on_missing = config.getenum(section, 'QueryOnMissing',
@@ -606,6 +616,7 @@ def cli(**options):
         if queries:
             for query_name, (interval, timeout, indices, query,
                              on_error, on_missing) in queries.items():
+                log.debug(f'Secheduling query: {query_name}')
                 schedule_job(scheduler, executor, interval,
                              run_query, es_client, query_name, indices, query,
                              timeout, on_error, on_missing)
