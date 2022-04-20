@@ -436,6 +436,8 @@ CONFIGPARSER_CONVERTERS = {
                    'Header name and value should be separated by colon, e.g. '
                    '"Authorization: Bearer xxxxx". Several headers can be added '
                    'by repeating the -H parameter.')
+@click.option('--addr', '-a', default='0.0.0.0',
+              help='Address to serve the metrics endpoint on. (default: 0.0.0.0)')
 @click.option('--port', '-p', default=9206,
               help='Port to serve the metrics endpoint on. (default: 9206)')
 @click.option('--query-disable', default=False, is_flag=True,
@@ -554,6 +556,7 @@ def cli(**options):
     )
     logging.captureWarnings(True)
 
+    addr = options['addr']
     port = options['port']
     es_cluster = options['es_cluster'].split(',')
 
@@ -644,8 +647,8 @@ def cli(**options):
         REGISTRY.register(QueryMetricCollector())
 
     log.info('Starting server...')
-    start_http_server(port)
-    log.info('Server started on port %(port)s', {'port': port})
+    start_http_server(port, addr)
+    log.info('Server started on %(addr)s:%(port)s', {'port': port, 'addr': addr})
 
     if scheduler:
         scheduler.run()
