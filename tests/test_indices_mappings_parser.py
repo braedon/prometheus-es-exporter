@@ -11,7 +11,7 @@ class Test(unittest.TestCase):
     # server populated with the following data (http command = Httpie utility):
     # > http -v POST localhost:9200/foo/_doc/1 val:=1 group1=a group2=a
     # > http -v POST localhost:9200/foo/_doc/2 val:=2 group1=a group2=b
-    # > http -v POST localhost:9200/foo/_doc/3 val:=3 group1=b group2=b
+    # > http -v POST localhost:9200/foo/_doc/3 val:=3 group1=b group2=b sub:='{"sub_val": 4}'
     def test_endpoint(self):
         # Endpoint: /_mappings?pretty
         response = {
@@ -36,6 +36,13 @@ class Test(unittest.TestCase):
                                 }
                             }
                         },
+                        "sub": {
+                            "properties": {
+                                "sub_val": {
+                                    "type": "long"
+                                }
+                            }
+                        },
                         "val": {
                             "type": "long"
                         }
@@ -46,8 +53,9 @@ class Test(unittest.TestCase):
 
         expected = {
             'field_count{index="foo",field_type="keyword"}': 2,
-            'field_count{index="foo",field_type="long"}': 1,
-            'field_count{index="foo",field_type="text"}': 2
+            'field_count{index="foo",field_type="long"}': 2,
+            'field_count{index="foo",field_type="text"}': 2,
+            'field_count{index="foo",field_type="object"}': 1
         }
         result = convert_result(parse_response(response))
         self.assertEqual(expected, result)
@@ -75,7 +83,7 @@ class Test(unittest.TestCase):
     # server populated with the following data (http command = Httpie utility):
     # > http -v POST localhost:9200/foo/bar/1 val:=1 group1=a group2=a
     # > http -v POST localhost:9200/foo/bar/2 val:=2 group1=a group2=b
-    # > http -v POST localhost:9200/foo/bar/3 val:=3 group1=b group2=b
+    # > http -v POST localhost:9200/foo/bar/3 val:=3 group1=b group2=b sub:='{"sub_val": 4}'
     def test_old_endpoint(self):
         # Endpoint: /_mappings?pretty
         response = {
@@ -101,6 +109,13 @@ class Test(unittest.TestCase):
                                     }
                                 }
                             },
+                            "sub": {
+                                "properties": {
+                                    "sub_val": {
+                                        "type": "long"
+                                    }
+                                }
+                            },
                             "val": {
                                 "type": "long"
                             }
@@ -112,8 +127,9 @@ class Test(unittest.TestCase):
 
         expected = {
             'field_count{index="foo",field_type="keyword"}': 2,
-            'field_count{index="foo",field_type="long"}': 1,
-            'field_count{index="foo",field_type="text"}': 2
+            'field_count{index="foo",field_type="long"}': 2,
+            'field_count{index="foo",field_type="text"}': 2,
+            'field_count{index="foo",field_type="object"}': 1
         }
         result = convert_result(parse_response(response))
         self.assertEqual(expected, result)
