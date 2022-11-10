@@ -70,6 +70,8 @@ By default, it will bind to port 9206, query Elasticsearch on `localhost:9200` a
 ```
 Run with the `-h` flag to see details on all the available options.
 
+Set the environment var `WSGI_AUTH_CREDENTIALS` to `user:password` to protect the metrics endpoint with a basic auth user. E.g. 'foo:bar'. Multiple credentials are separated with a | (pipe) character.
+
 Note that all options can be set via environment variables. The environment variable names are prefixed with `ES_EXPORTER`, e.g. `ES_EXPORTER_BASIC_USER=fred` is equivalent to `--basic-user fred`. CLI options take precedence over environment variables.
 
 Command line options can also be set from a configuration file, by passing `--config FILE`. The format of the file should be [Configobj's unrepre mode](https://configobj.readthedocs.io/en/latest/configobj.html#unrepr-mode), so instead of `--basic-user fred` you could use a configuration file `config_file` with `basic-user="fred"` in it, and pass `--config config_file`. CLI options and environment variables take precedence over configuration files.

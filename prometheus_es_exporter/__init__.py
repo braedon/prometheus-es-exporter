@@ -12,7 +12,10 @@ import time
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConnectionTimeout
 from jog import JogFormatter
-from prometheus_client import start_http_server
+from prometheus_client import make_wsgi_app
+from wsgiref.simple_server import make_server
+from wsgi_basic_auth import BasicAuth
+from threading import Thread
 from prometheus_client.core import GaugeMetricFamily, REGISTRY
 
 from . import cluster_health_parser
@@ -661,7 +664,12 @@ def cli(**options):
         REGISTRY.register(QueryMetricCollector())
 
     log.info('Starting server...')
-    start_http_server(port)
+    app = make_wsgi_app()
+    app = BasicAuth(app)
+    httpd = make_server('', port, app)
+    t = Thread(target=httpd.serve_forever)
+    t.daemon = True
+    t.start()
     log.info('Server started on port %(port)s', {'port': port})
 
     if scheduler:
