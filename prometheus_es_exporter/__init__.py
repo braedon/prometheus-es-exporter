@@ -558,6 +558,11 @@ def cli(**options):
     )
     logging.captureWarnings(True)
 
+    # Elasticsearch logs all requests at (at least) INFO level.
+    # To reduce log spam, only allow WARNING or higher logs unless we're in verbose/DEBUG mode.
+    if logging.getLogger().getEffectiveLevel() >= logging.INFO:
+        logging.getLogger('elasticsearch').setLevel(logging.WARNING)
+
     port = options['port']
     es_cluster = options['es_cluster'].split(',')
 

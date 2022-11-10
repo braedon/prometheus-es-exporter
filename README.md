@@ -50,6 +50,7 @@ Sum by index to calculate the total fields per index. Useful for checking if an 
 ```
 sum(es_indices_mappings_field_count) by(index) > 900
 ```
+Note that these counts don't include system fields (ones prefixed with `_`, e.g. `_id`), so may be slightly lower than the field count used by Elasticsearch to check the field limit.
 
 # Installation
 The exporter requires Python 3 and Pip 3 to be installed.

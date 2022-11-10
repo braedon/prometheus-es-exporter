@@ -13,6 +13,12 @@ def count_object_fields(object_mappings, counts=None):
     for field, mapping in object_mappings['properties'].items():
         # This field is an object, so count its fields.
         if 'properties' in mapping:
+            field_type = 'object'
+            if field_type in counts:
+                counts[field_type] += 1
+            else:
+                counts[field_type] = 1
+
             counts = count_object_fields(mapping, counts=counts)
 
         else:
