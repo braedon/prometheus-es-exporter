@@ -2,8 +2,9 @@ FROM remote-docker.artifactory.swisscom.com/python:3.8-slim
 
 RUN pip install --upgrade pip
 
-RUN adduser worker
-USER worker
+RUN groupadd --gid 1000 worker && useradd --uid 1000 --gid 1000 -m worker
+
+USER 1000
 WORKDIR /home/worker
 
 RUN pip install --user pipenv
