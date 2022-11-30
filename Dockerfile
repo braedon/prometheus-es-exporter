@@ -1,16 +1,25 @@
-FROM python:3.8-slim
+FROM remote-docker.artifactory.swisscom.com/python:3.8-slim
 
-WORKDIR /usr/src/app
+RUN pip install --upgrade pip
 
-COPY setup.py /usr/src/app/
-COPY README.md /usr/src/app/
+RUN groupadd --gid 1000 worker && useradd --uid 1000 --gid 1000 -m worker
+
+USER 1000
+WORKDIR /home/worker
+
+RUN pip install --user pipenv
+ENV PATH="/home/worker/.local/bin:${PATH}"
+
+COPY --chown=worker:worker setup.py /home/worker
+COPY --chown=worker:worker README.md /home/worker
 # Elasticsearch switched to a non open source license from version 7.11 onwards.
 # Limit to earlier versions to avoid license and compatibility issues.
-RUN pip install -e . 'elasticsearch<7.11'
+RUN pip install --user -e . 'elasticsearch<7.11'
+RUN pip install --user -e . 'wsgi_basic_auth'
 
-COPY prometheus_es_exporter/*.py /usr/src/app/prometheus_es_exporter/
-COPY LICENSE /usr/src/app/
+COPY --chown=worker:worker prometheus_es_exporter/*.py /home/worker/prometheus_es_exporter/
+COPY --chown=worker:worker LICENSE /home/worker
 
 EXPOSE 9206
 
-ENTRYPOINT ["python", "-u", "/usr/local/bin/prometheus-es-exporter"]
+ENTRYPOINT ["python", "-u", "/home/worker/prometheus_es_exporter"]

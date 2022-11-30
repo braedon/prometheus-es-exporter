@@ -12,7 +12,10 @@ import time
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConnectionTimeout
 from jog import JogFormatter
-from prometheus_client import start_http_server
+from prometheus_client import make_wsgi_app
+from wsgiref.simple_server import make_server
+from wsgi_basic_auth import BasicAuth
+from threading import Thread
 from prometheus_client.core import GaugeMetricFamily, REGISTRY
 
 from . import cluster_health_parser
@@ -199,6 +202,10 @@ class QueryMetricCollector(object):
         for metric_dict in query_metrics.values():
             yield from gauge_generator(metric_dict)
 
+def drop_after(query_name):
+
+    log.info("Clearing the cache...")
+    METRICS_BY_QUERY[query_name] = {}
 
 def run_query(es_client, query_name, indices, query,
               timeout, on_error, on_missing):
@@ -602,18 +609,26 @@ def cli(**options):
                                           fallback='drop')
                 on_missing = config.getenum(section, 'QueryOnMissing',
                                             fallback='drop')
+                drop_after_missing_preserve = config.getfloat(section, 'QueryOnMissingPreserveButDropAfterSecs',
+                                            fallback=0)
 
                 queries[query_name] = (interval, timeout, indices, query,
-                                       on_error, on_missing)
+                                       on_error, on_missing, drop_after_missing_preserve)
 
         scheduler = sched.scheduler()
 
         if queries:
             for query_name, (interval, timeout, indices, query,
-                             on_error, on_missing) in queries.items():
+                             on_error, on_missing, drop_after_missing_preserve) in queries.items():
+                """ If drop after is set, setup a scheduler to clear the cache """
+                if on_missing == 'preserve' and drop_after_missing_preserve > 0:
+                    schedule_job(scheduler, executor, drop_after_missing_preserve,
+                                                 drop_after, query_name)
+
                 schedule_job(scheduler, executor, interval,
                              run_query, es_client, query_name, indices, query,
                              timeout, on_error, on_missing)
+
         else:
             log.error('No queries found in config file(s)')
             return
@@ -649,7 +664,12 @@ def cli(**options):
         REGISTRY.register(QueryMetricCollector())
 
     log.info('Starting server...')
-    start_http_server(port)
+    app = make_wsgi_app()
+    app = BasicAuth(app)
+    httpd = make_server('', port, app)
+    t = Thread(target=httpd.serve_forever)
+    t.daemon = True
+    t.start()
     log.info('Server started on port %(port)s', {'port': port})
 
     if scheduler:
