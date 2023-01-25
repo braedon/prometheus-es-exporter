@@ -9,11 +9,16 @@ import os
 import sched
 import time
 
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, RequestsHttpConnection
 from elasticsearch.exceptions import ConnectionTimeout
 from jog import JogFormatter
 from prometheus_client import start_http_server
 from prometheus_client.core import GaugeMetricFamily, REGISTRY
+try:
+    from requests_aws4auth import AWS4Auth
+    from botocore.session import Session
+except ImportError:
+    pass
 
 from . import cluster_health_parser
 from . import indices_aliases_parser
@@ -209,9 +214,19 @@ def run_query(es_client, query_name, indices, query,
         metrics = parse_response(response, [query_name])
         metric_dict = group_metrics(metrics)
 
-    except Exception:
+    except Exception as e:
         log.exception('Error while querying indices %(indices)s, query %(query)s.',
                       {'indices': indices, 'query': query})
+
+        # NOTE(mjozefcz): If there is 401/403 http error, and the AWS signing was
+        # set, re-raise it and exit the exporter. It might be wrongly-configured
+        # credentials or old session.
+        try:
+            if e.status_code in [401, 403] and type(es_client.transport.kwargs.get("http_auth")) is AWS4Auth:
+                # TODO (mjozefcz): Consider re-initialization of AWS4AUTH if possible.
+                raise e
+        except NameError:
+            pass
 
         # If this query has successfully run before, we need to handle any
         # metrics produced by that previous run.
@@ -404,6 +419,9 @@ CONFIGPARSER_CONVERTERS = {
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
+@click.option('--aws-sign-request', default=False, is_flag=True,
+              help='This should be set if you want your requests to be signed with AWS credentials retrieved from your environment.')
+@click.option('--aws-region', help='Region name to be used while signing request with AWS credentials')
 @click.option('--es-cluster', '-e', default='localhost',
               help='Addresses of nodes in a Elasticsearch cluster to run queries on. '
                    'Nodes should be separated by commas e.g. es1,es2. '
@@ -516,6 +534,8 @@ def cli(**options):
         raise click.BadOptionUsage('basic_password', 'Password provided with no username.')
     elif options['basic_user']:
         http_auth = (options['basic_user'], options['basic_password'])
+    elif options['aws_sign_request'] and not options['aws_region']:
+        raise click.BadOptionUsage('aws_sign_requst', 'AWS requests signing enabled but region not provided.')
     else:
         http_auth = None
 
@@ -562,19 +582,30 @@ def cli(**options):
     port = options['port']
     es_cluster = options['es_cluster'].split(',')
 
+    kwargs = {
+       "https_auth": http_auth,
+       "headers": options['header'],
+       "verify_certs": False
+    }
+
+    if options['aws_sign_request'] and options['aws_region']:
+        service = 'es'
+        credentials = Session().get_credentials()
+        http_auth = AWS4Auth(credentials.access_key, credentials.secret_key, options['aws_region'], service, session_token=credentials.token)
+        kwargs.update({
+            "http_auth": http_auth,
+            "connection_class": RequestsHttpConnection
+        })
+
     if options['ca_certs']:
-        es_client = Elasticsearch(es_cluster,
-                                  verify_certs=True,
-                                  ca_certs=options['ca_certs'],
-                                  client_cert=options['client_cert'],
-                                  client_key=options['client_key'],
-                                  headers=options['header'],
-                                  http_auth=http_auth)
-    else:
-        es_client = Elasticsearch(es_cluster,
-                                  verify_certs=False,
-                                  headers=options['header'],
-                                  http_auth=http_auth)
+        kwargs.update({
+            "verify_certs": True,
+            "ca_certs": options['ca_certs'],
+            "client_cert": options['client_cert'],
+            "client_key": options['client_key']
+        })
+
+    es_client = Elasticsearch(es_cluster, **kwargs)
 
     scheduler = None
 
