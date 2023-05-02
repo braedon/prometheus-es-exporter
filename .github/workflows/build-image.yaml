@@ -1,0 +1,63 @@
+name: docker-build-es-exporter
+
+env:
+  registry: ghcr.io
+
+on:
+  push:
+    branch:
+      - "feat/operator"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get image tags
+        id: tag
+        run: |
+          echo "tag is ${{ github.sha }}"
+          echo "tag=`echo ${{ github.sha }} | cut -c1-6`" >> $GITHUB_OUTPUT
+
+      - name: Checkout Server
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Create docker context
+        run: |
+          docker context create ctx
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        id: buildx
+        with:
+          endpoint: ctx
+          driver-opts: env.BUILDKIT_STEP_LOG_MAX_SIZE=10485760,env.BUILDKIT_STEP_LOG_MAX_SPEED=10485760
+
+      - name: Inspect builder
+        run: |
+          echo "Name:      ${{ steps.buildx.outputs.name }}"
+          echo "Endpoint:  ${{ steps.buildx.outputs.endpoint }}"
+          echo "Status:    ${{ steps.buildx.outputs.status }}"
+          echo "Flags:     ${{ steps.buildx.outputs.flags }}"
+          echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
+          echo "Build tag  ${{ steps.tag.outputs.tag }}"
+      - name: Login to GHRC
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ${{ env.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v3
+        with:
+          context: ./
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.registry }}/${{ github.repository }}:${{ steps.tag.outputs.tag }}, ${{ env.registry }}/${{ github.repository }}:latest
+          builder: ${{ steps.buildx.outputs.name }}
+          file: ./Dockerfile

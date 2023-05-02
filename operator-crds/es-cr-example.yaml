@@ -1,0 +1,14 @@
+apiVersion: braedon.github.io/v1alpha1
+kind: ElasticQueryExporter
+metadata:
+  name: my-test-index
+spec:
+  queryIntervalSecs: 3
+  queryIndices: test-nginx-nginx-access
+  queryJson: >
+    {
+        "size": 0,
+        "query": {
+            "match_all": {}
+        }
+    }

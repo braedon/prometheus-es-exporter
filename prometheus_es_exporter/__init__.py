@@ -23,8 +23,11 @@ from . import nodes_stats_parser
 from .metrics import (group_metrics, gauge_generator,
                       format_metric_name, merge_metric_dicts)
 from .parser import parse_response
-from .scheduler import schedule_job
+from .scheduler import schedule_jobs
 from .utils import log_exceptions, nice_shutdown
+
+from multiprocessing import Process
+import kubernetes
 
 log = logging.getLogger(__name__)
 
@@ -397,6 +400,107 @@ def configparser_enum_conv(enum):
 
     return conv
 
+def kubeOperator(config_dir):
+    group = 'braedon.github.io'
+    vers = 'v1alpha1'
+    customResource = 'esqueries'
+    # TODO allow passing kubeconfig path via cmd flags
+    kubeconf_loaded = False
+    try:
+        kubernetes.config.load_incluster_config()
+        kubeconf_loaded = True
+    except Exception as e:
+        log.error("Operator: " + str(e))
+
+    if not kubeconf_loaded:
+        log.info("Operator - exiting kubeconfig not set")
+        return
+
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+
+    customObjects = kubernetes.client.CustomObjectsApi()
+    #v1 = client.CoreV1Api()
+
+    def getSection(name):
+        return "query_" + name.replace("-","_")
+
+    def getConfigFile(name, ns, adddir = True):
+        if adddir:
+            return config_dir + '/' + ns + '_' + getSection(name) + '.cfg'
+        else:
+            return ns + '_' + getSection(name) + '.cfg'
+
+    def updateConfigs(item):
+        print(item)
+        config = configparser.ConfigParser()
+        name = item["metadata"]["name"]
+        ns =  item["metadata"]["namespace"]
+        section = getSection(name)
+        config.add_section(section)
+        spec = item["spec"]
+        for k, v in spec.items():
+            config.set(section, str(k), str(v))
+        # can we hit parcial write during read in main thread? should we create tmp config and move atomically?
+        with open(getConfigFile(name, ns), 'w') as configfile:
+            log.info('Writing config ' + getConfigFile(name, ns))
+            config.write(configfile)
+
+    for item in customObjects.list_cluster_custom_object(group, vers, customResource)["items"]:
+        updateConfigs(item)
+
+    watch = kubernetes.watch.Watch()
+    for ev in watch.stream(customObjects.list_cluster_custom_object, group, vers, customResource):
+        namespace = ev["object"]["metadata"]["namespace"]
+        items_in_ns = []
+        for item in customObjects.list_namespaced_custom_object(group, vers, namespace, customResource)["items"]:
+            updateConfigs(item)
+            name = item["metadata"]["name"]
+            items_in_ns.append(getConfigFile(name, namespace, False))
+        try:
+            for cfgFile in os.listdir(config_dir):
+                if cfgFile not in items_in_ns and cfgFile.startswith(namespace + '_'):
+                    log.info('Removing config ' + str(cfgFile))
+                    os.remove(config_dir + '/' + cfgFile)
+        except Exception as e:
+            log.error("Operator: " + str(e))
+
+class LoadConfig():
+    def __init__(self, config_file, config_dir ):
+        self.config_file = config_file
+        self.config_dir = config_dir
+        self.query_prefix = 'query_'
+
+    def load(self):
+        config = configparser.ConfigParser(converters=CONFIGPARSER_CONVERTERS)
+        try:
+            config.read(self.config_file)
+        except Exception as e:
+            log.error(str(e))
+
+        config_dir_file_pattern = os.path.join(self.config_dir, '*.cfg')
+        config_dir_sorted_files = sorted(glob.glob(config_dir_file_pattern))
+        config.read(config_dir_sorted_files)
+        queries = {}
+        for section in config.sections():
+            if section.startswith(self.query_prefix):
+                query_name = section[len(self.query_prefix):]
+                interval = config.getfloat(section, 'QueryIntervalSecs',
+                                           fallback=15)
+                timeout = config.getfloat(section, 'QueryTimeoutSecs',
+                                          fallback=10)
+                indices = config.get(section, 'QueryIndices',
+                                     fallback='_all')
+                query = json.loads(config.get(section, 'QueryJson'))
+                on_error = config.getenum(section, 'QueryOnError',
+                                          fallback='drop')
+                on_missing = config.getenum(section, 'QueryOnMissing',
+                                            fallback='drop')
+
+                queries[query_name] = (interval, timeout, indices, query,
+                                       on_error, on_missing)
+        return queries
+
 
 CONFIGPARSER_CONVERTERS = {
     'enum': configparser_enum_conv(('preserve', 'drop', 'zero'))
@@ -507,6 +611,9 @@ CONFIGPARSER_CONVERTERS = {
               help='Detail level to log. (default: INFO)')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Turn on verbose (DEBUG) logging. Overrides --log-level.')
+@click.option('--operator-mode', default=False, is_flag=True,
+              help='Turn on kubernetes operator mode.')
+
 @click_config_file.configuration_option()
 def cli(**options):
     """Export Elasticsearch query results to Prometheus."""
@@ -579,44 +686,16 @@ def cli(**options):
     scheduler = None
 
     if not options['query_disable']:
-        config = configparser.ConfigParser(converters=CONFIGPARSER_CONVERTERS)
-        config.read(options['config_file'])
-
-        config_dir_file_pattern = os.path.join(options['config_dir'], '*.cfg')
-        config_dir_sorted_files = sorted(glob.glob(config_dir_file_pattern))
-        config.read(config_dir_sorted_files)
-
-        query_prefix = 'query_'
-        queries = {}
-        for section in config.sections():
-            if section.startswith(query_prefix):
-                query_name = section[len(query_prefix):]
-                interval = config.getfloat(section, 'QueryIntervalSecs',
-                                           fallback=15)
-                timeout = config.getfloat(section, 'QueryTimeoutSecs',
-                                          fallback=10)
-                indices = config.get(section, 'QueryIndices',
-                                     fallback='_all')
-                query = json.loads(config.get(section, 'QueryJson'))
-                on_error = config.getenum(section, 'QueryOnError',
-                                          fallback='drop')
-                on_missing = config.getenum(section, 'QueryOnMissing',
-                                            fallback='drop')
-
-                queries[query_name] = (interval, timeout, indices, query,
-                                       on_error, on_missing)
+        load = LoadConfig(options['config_file'], options['config_dir'])
 
         scheduler = sched.scheduler()
-
-        if queries:
-            for query_name, (interval, timeout, indices, query,
-                             on_error, on_missing) in queries.items():
-                schedule_job(scheduler, executor, interval,
-                             run_query, es_client, query_name, indices, query,
-                             timeout, on_error, on_missing)
-        else:
-            log.error('No queries found in config file(s)')
-            return
+        #schedule_jobs(scheduler, executor, load, run_query, es_client)
+        last_schedule = {}
+        scheduler.enterabs(time=time.monotonic(),
+                        priority=1,
+                        action=schedule_jobs,
+                        argument=(last_schedule, scheduler, executor, load, run_query, es_client),
+                        )
 
     if not options['cluster_health_disable']:
         REGISTRY.register(ClusterHealthCollector(es_client,
@@ -652,11 +731,18 @@ def cli(**options):
     start_http_server(port)
     log.info('Server started on port %(port)s', {'port': port})
 
+    operator = None
+    if options['operator_mode']:
+        operator = Process(target=kubeOperator, args=(options['config_dir'],))
+        operator.start()
+
     if scheduler:
         scheduler.run()
     else:
         while True:
             time.sleep(5)
+    if operator:
+        operator.join(10)
 
 
 @log_exceptions(exit_on_exception=True)
