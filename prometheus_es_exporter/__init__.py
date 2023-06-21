@@ -201,7 +201,7 @@ class QueryMetricCollector(object):
 
 
 def run_query(es_client, query_name, indices, query,
-              timeout, on_error, on_missing):
+              timeout, on_error, on_missing, static_labels):
 
     try:
         response = es_client.search(index=indices, body=query, request_timeout=timeout)
@@ -230,6 +230,8 @@ def run_query(es_client, query_name, indices, query,
                 # metrics, but all zero values.
                 metric_dict = merge_metric_dicts(old_metric_dict, {},
                                                  zero_missing=True)
+            for label, value in static_labels.items():
+                metric_dict[label] = value
 
             METRICS_BY_QUERY[query_name] = metric_dict
 
@@ -602,18 +604,24 @@ def cli(**options):
                                           fallback='drop')
                 on_missing = config.getenum(section, 'QueryOnMissing',
                                             fallback='drop')
+                opt_static_labels = config.get(section, 'StaticLabels',
+                                            fallback='')
+                static_labels = {}
+                for kv in opt_static_labels.split(','):
+                    k, v, _ = kv.split('=')
+                    static_labels[k] = v
 
                 queries[query_name] = (interval, timeout, indices, query,
-                                       on_error, on_missing)
+                                       on_error, on_missing, static_labels)
 
         scheduler = sched.scheduler()
 
         if queries:
             for query_name, (interval, timeout, indices, query,
-                             on_error, on_missing) in queries.items():
+                             on_error, on_missing, static_labels) in queries.items():
                 schedule_job(scheduler, executor, interval,
                              run_query, es_client, query_name, indices, query,
-                             timeout, on_error, on_missing)
+                             timeout, on_error, on_missing, static_labels)
         else:
             log.error('No queries found in config file(s)')
             return
