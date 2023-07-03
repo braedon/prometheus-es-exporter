@@ -15,6 +15,9 @@ spec:
             spec:
               type: object
               properties:
+                label:
+                  type: string
+                  description: Metrics label.
                 queryJson:
                   type: string
                   description: The search query to run.
@@ -33,6 +36,10 @@ spec:
                 queryOnMissing:
                   type: string
                   description: What to do if a metric produced by the previous run of a query is not present. On of preserve, drop, zero.
+              required:
+              - label
+              - queryJson
+              - queryIndices
   scope: Namespaced
   names:
     plural: esqueries

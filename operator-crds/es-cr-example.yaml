@@ -3,6 +3,7 @@ kind: ElasticQueryExporter
 metadata:
   name: my-test-index
 spec:
+  label: my-test-error
   queryIntervalSecs: 3
   queryIndices: test-nginx-nginx-access
   queryJson: >

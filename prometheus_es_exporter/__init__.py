@@ -9,6 +9,8 @@ import os
 import sched
 import time
 
+import requests
+
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConnectionTimeout
 from jog import JogFormatter
@@ -27,6 +29,7 @@ from .scheduler import schedule_jobs
 from .utils import log_exceptions, nice_shutdown
 
 from multiprocessing import Process
+from threading import Thread
 import kubernetes
 
 log = logging.getLogger(__name__)
@@ -202,6 +205,22 @@ class QueryMetricCollector(object):
         for metric_dict in query_metrics.values():
             yield from gauge_generator(metric_dict)
 
+
+class QuerySingleMetricCollector(object):
+
+    def collect(self):
+        query_metrics = METRICS_BY_QUERY.copy()
+
+        single_metrics = "es_exporter_queries"
+        single_metric_dict = {}
+        single_metric_dict[single_metrics] = ()
+
+        for metric_dict in query_metrics.values():
+            idx_key = list(metric_dict.keys())[0]
+            tupleAsList = list(metric_dict[idx_key])
+            orig_value = tupleAsList[2][list(tupleAsList[2].keys())[0]]
+            single_metric_dict[single_metrics] = ('', {"label": idx_key}, { (idx_key,"label"): orig_value} )
+            yield from gauge_generator(single_metric_dict)
 
 def run_query(es_client, query_name, indices, query,
               timeout, on_error, on_missing):
@@ -400,26 +419,26 @@ def configparser_enum_conv(enum):
 
     return conv
 
-def kubeOperator(config_dir):
-    group = 'braedon.github.io'
-    vers = 'v1alpha1'
-    customResource = 'esqueries'
-    # TODO allow passing kubeconfig path via cmd flags
+def kubeOperator(config_dir, es_cluster):
     kubeconf_loaded = False
     try:
         kubernetes.config.load_incluster_config()
         kubeconf_loaded = True
+    except kubernetes.config.ConfigException:
+        kubernetes.config.load_kube_config()
+        kubeconf_loaded = True
+        log.info("Operator loaded local KUBECONFIG")
     except Exception as e:
         log.error("Operator: " + str(e))
 
     if not kubeconf_loaded:
-        log.info("Operator - exiting kubeconfig not set")
+        log.info("Operator - exiting operator process, kubeconfig not set")
         return
 
     if not os.path.exists(config_dir):
         os.makedirs(config_dir)
 
-    customObjects = kubernetes.client.CustomObjectsApi()
+    customObjectsApi = kubernetes.client.CustomObjectsApi()
     #v1 = client.CoreV1Api()
 
     def getSection(name):
@@ -431,39 +450,146 @@ def kubeOperator(config_dir):
         else:
             return ns + '_' + getSection(name) + '.cfg'
 
-    def updateConfigs(item):
-        print(item)
-        config = configparser.ConfigParser()
-        name = item["metadata"]["name"]
-        ns =  item["metadata"]["namespace"]
-        section = getSection(name)
-        config.add_section(section)
-        spec = item["spec"]
-        for k, v in spec.items():
-            config.set(section, str(k), str(v))
-        # can we hit parcial write during read in main thread? should we create tmp config and move atomically?
-        with open(getConfigFile(name, ns), 'w') as configfile:
-            log.info('Writing config ' + getConfigFile(name, ns))
-            config.write(configfile)
 
-    for item in customObjects.list_cluster_custom_object(group, vers, customResource)["items"]:
-        updateConfigs(item)
+
 
     watch = kubernetes.watch.Watch()
-    for ev in watch.stream(customObjects.list_cluster_custom_object, group, vers, customResource):
-        namespace = ev["object"]["metadata"]["namespace"]
-        items_in_ns = []
-        for item in customObjects.list_namespaced_custom_object(group, vers, namespace, customResource)["items"]:
-            updateConfigs(item)
+
+    def esqueries_worker_run(watch_api, config_dir, customObjectsApi, group, vers, customResource):
+        log.info("WORKER esqueries_worker_run RUNNING")
+
+        def updateConfigs(item):
+            config = configparser.ConfigParser()
             name = item["metadata"]["name"]
-            items_in_ns.append(getConfigFile(name, namespace, False))
-        try:
-            for cfgFile in os.listdir(config_dir):
-                if cfgFile not in items_in_ns and cfgFile.startswith(namespace + '_'):
-                    log.info('Removing config ' + str(cfgFile))
-                    os.remove(config_dir + '/' + cfgFile)
-        except Exception as e:
-            log.error("Operator: " + str(e))
+            ns =  item["metadata"]["namespace"]
+            section = getSection(item["spec"]["label"])
+            config.add_section(section)
+            spec = item["spec"]
+            for k, v in spec.items():
+                config.set(section, str(k), str(v))
+            # can we hit parcial write during read in main thread? should we create tmp config and move atomically?
+            with open(getConfigFile(name, ns), 'w') as configfile:
+                log.info('Writing config ' + getConfigFile(name, ns))
+                config.write(configfile)
+
+        for item in customObjectsApi.list_cluster_custom_object(group, vers, customResource)["items"]:
+            updateConfigs(item)
+
+        for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource):
+            namespace = ev["object"]["metadata"]["namespace"]
+            items_in_ns = []
+            for item in customObjectsApi.list_namespaced_custom_object(group, vers, namespace, customResource)["items"]:
+                updateConfigs(item)
+                name = item["metadata"]["name"]
+                items_in_ns.append(getConfigFile(name, namespace, False))
+            try:
+                for cfgFile in os.listdir(config_dir):
+                    if cfgFile not in items_in_ns and cfgFile.startswith(namespace + '_'):
+                        log.info('Removing config ' + str(cfgFile))
+                        os.remove(config_dir + '/' + cfgFile)
+            except Exception as e:
+                log.error("Operator: " + str(e))
+
+    def estemplates_worker_run(watch_api, config_dir, customObjectsApi, group, vers, customResource):
+        log.info("WORKER estemplates_worker_run RUNNING")
+
+        def updateEsTemplate(templateName, template, namespace):
+            templateName = item['spec']['templateName']
+            log.info(f"Updating template {templateName}")
+            r = requests.put(f"{es_cluster[0]}/_template/{templateName}",
+                json=template,
+                timeout=15)
+            if r.ok:
+                op = {"Op": "replace", "Path": "/status/provisioned", "Value": "dopice"}
+                ret = customObjectsApi.patch_namespaced_custom_object_status(group, vers, namespace, 'estemplates', item['metadata']['name'], op) #, field_manager='prom-es-exporter-operator')
+                #log.info(f"Updating template {templateName} STATUS {ret}")
+            else:
+                log.error(f"Updating template {template} returned error")
+                log.error(json.dumps(r.json()))
+
+
+        def deleteEsTemplate(templateName):
+            log.info(f"Adding template {templateName}")
+            r = requests.delete(f"{es_cluster[0]}/_template/{templateName}",
+                timeout=15)
+            if not r.ok:
+                log.error(f"Deleting template {template} returned error")
+                log.error(json.dumps(r.json()))
+
+
+        def buildTemplate(resource):
+            try:
+                mappings = json.loads(item['spec']['mappings'])
+            except ValueError as e:
+                log.error(f"Mapping error in {item['spec']['templateName']} custom resource")
+            else:
+                template = {
+                    "index_patterns": [
+                        "ts2-*-server-*"
+                    ],
+                    "settings": {
+                        "index": {
+                            "codec": item['spec']['codec'],
+                            "refresh_interval": item['spec']['refreshInterval'],
+                            "number_of_shards": item['spec']['numberOfShards'],
+                            "number_of_replicas": item['spec']['numberOfReplicas']
+                        }
+                    },
+                    "mappings": mappings,
+                }
+
+                if item['spec']['order']:
+                    template['order'] = item['spec']['order']
+
+                return template
+            return None
+
+
+        for item in customObjectsApi.list_cluster_custom_object(group, vers, customResource)["items"]:
+
+            templateName = item['spec']['templateName']
+            template = buildTemplate(item)
+            if template:
+                updateEsTemplate(item, template, item['metadata']['namespace'])
+
+        for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource):
+            print("EVENT", ev)
+            item = ev['object']
+
+            if ev['type'] == 'DELETED':
+                templateName = item['spec']['templateName']
+                if item['spec']['deleteTemplate']:
+                    deleteEsTemplate(templateName)
+                pass
+            if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
+                templateName = item['spec']['templateName']
+                template = buildTemplate(item)
+                if template:
+                    updateEsTemplate(templateName, template, item['metadata']['namespace'])
+
+
+        #we need to list all check push them to elastic
+        # watch, push changes
+        # WHAT ABOUT DELETED RESOURCE? deleteTemplate option
+        # INDEX ROLLOVER AS OPTION IN TEMPLATE option rolloverIndexAfterUpdate
+        # merge if muliple same index name?
+        pass
+
+    resources = [
+        {"group": "braedon.github.io", "vers": "v1alpha1", "customResource": "esqueries", "fn": esqueries_worker_run},
+        #{"group": "braedon.github.io", "vers": "v1alpha1", "customResource": "estemplates", "fn": estemplates_worker_run},
+    ]
+
+    thrds = []
+    for resource in resources:
+
+        worker = Thread(target=resource['fn'],args=(watch, config_dir, customObjectsApi, resource["group"], resource["vers"], resource["customResource"]) )
+        worker.daemon = True
+        worker.start()
+        thrds.append(worker)
+
+    for thrd in thrds:
+        thrd.join()
 
 class LoadConfig():
     def __init__(self, config_file, config_dir ):
@@ -613,6 +739,12 @@ CONFIGPARSER_CONVERTERS = {
               help='Turn on verbose (DEBUG) logging. Overrides --log-level.')
 @click.option('--operator-mode', default=False, is_flag=True,
               help='Turn on kubernetes operator mode.')
+@click.option('--single-metric', default=True, is_flag=True,
+              help='Use just one metrics with labels with operator mode')
+@click.option('--filter-customer-resource-labels',
+              callback=indices_stats_indices_parser,
+              help='Consider only reources which match label. '
+                   'Labels should be separated by commas e.g. env=dev,app=base.')
 
 @click_config_file.configuration_option()
 def cli(**options):
@@ -725,7 +857,10 @@ def cli(**options):
                                                 fields=options['indices_stats_fields']))
 
     if scheduler:
-        REGISTRY.register(QueryMetricCollector())
+        if options['operator_mode'] and options['single_metric']:
+            REGISTRY.register(QuerySingleMetricCollector())
+        else:
+            REGISTRY.register(QueryMetricCollector())
 
     log.info('Starting server...')
     start_http_server(port)
@@ -733,7 +868,7 @@ def cli(**options):
 
     operator = None
     if options['operator_mode']:
-        operator = Process(target=kubeOperator, args=(options['config_dir'],))
+        operator = Process(target=kubeOperator, args=(options['config_dir'], es_cluster,))
         operator.start()
 
     if scheduler:
