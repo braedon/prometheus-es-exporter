@@ -540,13 +540,13 @@ def kubeOperator(config_dir, es_cluster):
         def buildTemplate(resource):
             try:
                 mappings = json.loads(item['spec']['mappings'])
+                idxPatterns = item['spec']['indexPatterns']
+                idxPatterns = [pattern + "-*" for pattern in idxPatterns]
             except ValueError as e:
                 log.error(f"Mapping error in {item['spec']['templateName']} custom resource")
             else:
                 template = {
-                    "index_patterns": [
-                        "ts2-*-server-*"
-                    ],
+                    "index_patterns": idxPatterns,
                     "settings": {
                         "index": {
                             "codec": item['spec']['codec'],
