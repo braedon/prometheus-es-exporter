@@ -8,6 +8,7 @@ import logging
 import os
 import sched
 import time
+import datetime
 
 import requests
 
@@ -441,22 +442,20 @@ def kubeOperator(config_dir, es_cluster):
     customObjectsApi = kubernetes.client.CustomObjectsApi()
     #v1 = client.CoreV1Api()
 
-    def getSection(name):
-        return "query_" + name.replace("-","_")
-
-    def getConfigFile(name, ns, adddir = True):
-        if adddir:
-            return config_dir + '/' + ns + '_' + getSection(name) + '.cfg'
-        else:
-            return ns + '_' + getSection(name) + '.cfg'
-
-
-
 
     watch = kubernetes.watch.Watch()
 
     def esqueries_worker_run(watch_api, config_dir, customObjectsApi, group, vers, customResource):
         log.info("WORKER esqueries_worker_run RUNNING")
+
+        def getSection(name):
+            return "query_" + name.replace("-","_")
+
+        def getConfigFile(name, ns, adddir = True):
+            if adddir:
+                return config_dir + '/' + ns + '_' + getSection(name) + '.cfg'
+            else:
+                return ns + '_' + getSection(name) + '.cfg'
 
         def updateConfigs(item):
             config = configparser.ConfigParser()
@@ -472,49 +471,70 @@ def kubeOperator(config_dir, es_cluster):
                 log.info('Writing config ' + getConfigFile(name, ns))
                 config.write(configfile)
 
-        for item in customObjectsApi.list_cluster_custom_object(group, vers, customResource)["items"]:
-            updateConfigs(item)
-
+        items_in_ns = []
         for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource):
-            namespace = ev["object"]["metadata"]["namespace"]
-            items_in_ns = []
-            for item in customObjectsApi.list_namespaced_custom_object(group, vers, namespace, customResource)["items"]:
+            item = ev["object"]
+            namespace = item["metadata"]["namespace"]
+            name = item["metadata"]["name"]
+            if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
                 updateConfigs(item)
-                name = item["metadata"]["name"]
                 items_in_ns.append(getConfigFile(name, namespace, False))
-            try:
-                for cfgFile in os.listdir(config_dir):
-                    if cfgFile not in items_in_ns and cfgFile.startswith(namespace + '_'):
-                        log.info('Removing config ' + str(cfgFile))
-                        os.remove(config_dir + '/' + cfgFile)
-            except Exception as e:
-                log.error("Operator: " + str(e))
+            if ev['type'] == 'DELETED':
+                cfgFile = getConfigFile(name, namespace, False)
+                try:
+                    log.info('Removing config ' + str(cfgFile))
+                    os.remove(config_dir + '/' + cfgFile)
+                except Exception as e:
+                    log.error("Operator: " + str(e))
 
     def estemplates_worker_run(watch_api, config_dir, customObjectsApi, group, vers, customResource):
         log.info("WORKER estemplates_worker_run RUNNING")
 
-        def updateEsTemplate(templateName, template, namespace):
-            templateName = item['spec']['templateName']
-            log.info(f"Updating template {templateName}")
-            r = requests.put(f"{es_cluster[0]}/_template/{templateName}",
-                json=template,
-                timeout=15)
-            if r.ok:
-                op = {"Op": "replace", "Path": "/status/provisioned", "Value": "dopice"}
-                ret = customObjectsApi.patch_namespaced_custom_object_status(group, vers, namespace, 'estemplates', item['metadata']['name'], op) #, field_manager='prom-es-exporter-operator')
-                #log.info(f"Updating template {templateName} STATUS {ret}")
-            else:
-                log.error(f"Updating template {template} returned error")
-                log.error(json.dumps(r.json()))
+        IGNORE_UPDATES = {}
 
+        def updateStatus(item, merge_patch):
+            templateName = item['spec']['templateName']
+            name = item['metadata']['name']
+            namespace = item['metadata']['namespace']
+            # THIS BELOW IS JSON-PATCH with Content-Type: application/json-patch+json
+            # json_patch = {"op": "replace", "path": "/status/provisioned", "value": "NOT-WORKING-WITH-PYCLIENT"}
+            # BUT WE ARE USING "Content-Type: application/merge-patch+json", because of python kube api client
+            try:
+                api_response = customObjectsApi.patch_namespaced_custom_object_status(group, vers, namespace, customResource, item['metadata']['name'], merge_patch)
+                item_uid = api_response['metadata']['uid']
+                item_resource_vers = api_response['metadata']['resourceVersion']
+                log.debug(f"Updated template {templateName} k8s ElasticQueryExporterTemplate Status {api_response['status']}, resource version: {item_resource_vers}")
+                IGNORE_UPDATES[item_uid] = item_resource_vers
+            except Exception as e:
+                log.error(f"Updating template {name} k8s ElasticQueryExporterTemplate Status Exception: {str(e)}")
+
+        def updateEsTemplate(item, template):
+            templateName = item['spec']['templateName']
+            namespace = item['metadata']['namespace']
+            log.debug(f"Updating template {templateName} on ES cluster")
+            try:
+                es_request = requests.put(
+                    f"{es_cluster[0]}/_template/{templateName}",
+                    json=template,
+                    timeout=15
+                )
+            except Exception as e:
+                log.error(f"Updating estemplate {template} Exception: {str(e)}")
+            else:
+                if es_request.ok:
+                    return True
+                else:
+                    log.error(f"Updating estemplate {template} returned error -> {json.dumps(r.json())}")
+            return False
 
         def deleteEsTemplate(templateName):
-            log.info(f"Adding template {templateName}")
-            r = requests.delete(f"{es_cluster[0]}/_template/{templateName}",
-                timeout=15)
-            if not r.ok:
-                log.error(f"Deleting template {template} returned error")
-                log.error(json.dumps(r.json()))
+            log.debug(f"Deleting template {templateName}")
+            try:
+                es_request = requests.delete(f"{es_cluster[0]}/_template/{templateName}", timeout=15)
+            except Exception as e:
+                log.error(f"Deleting estemplate {template} Exception: {str(e)}")
+            if not es_request.ok:
+                log.error(f"Deleting template {template} returned error {json.dumps(es_request.json())}")
 
 
         def buildTemplate(resource):
@@ -544,40 +564,67 @@ def kubeOperator(config_dir, es_cluster):
                 return template
             return None
 
-
-        for item in customObjectsApi.list_cluster_custom_object(group, vers, customResource)["items"]:
-
-            templateName = item['spec']['templateName']
-            template = buildTemplate(item)
-            if template:
-                updateEsTemplate(item, template, item['metadata']['namespace'])
+        def rolloverAlias(item):
+            idxPatterns = item['spec']['indexPatterns']
+            namespace = item['metadata']['namespace']
+            resp = []
+            for pattern in idxPatterns:
+                log.info(f"Rolling index {pattern} [ {pattern}-writer ]")
+                try:
+                    es_request = requests.post(f"{es_cluster[0]}/{pattern}-writer/_rollover", timeout=15)
+                except Exception as e:
+                    resp.append(False)
+                    log.error(f"Rolling index {pattern} Exception: {str(e)}")
+                else:
+                    if es_request.ok:
+                        resp.append(True)
+                    else:
+                        resp.append(False)
+                        log.error(f"Rolling index {pattern} returned error {json.dumps(es_request.json())}")
+            if all(resp):
+                return True
+            return False
 
         for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource):
-            print("EVENT", ev)
             item = ev['object']
+            item_uid = item['metadata']['uid']
+            item_resource_version = item['metadata']['resourceVersion']
+            templateName = item['spec']['templateName']
+
+            log.debug(f"Template event {ev['type']}, name: {item['metadata']['name']}, resource version: {ev['object']['metadata']['resourceVersion']}")
 
             if ev['type'] == 'DELETED':
-                templateName = item['spec']['templateName']
                 if item['spec']['deleteTemplate']:
                     deleteEsTemplate(templateName)
-                pass
+                if item['spec']['rolloverIndexAfterUpdate']:
+                    rolloverAlias(item)
             if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
-                templateName = item['spec']['templateName']
+                if ev['type'] == 'MODIFIED' and item_uid in IGNORE_UPDATES and item_resource_version == IGNORE_UPDATES[item_uid]:
+                    log.debug(f"Ignored k8s ElasticQueryExporterTemplate update for {item_uid} and version {item_resource_version} already managed, modified event caused by status update")
+                    continue
                 template = buildTemplate(item)
+                # We need just one status update in this cycle, because it will generate modiefied event
+                # updateStatus will add ignore for resource version to IGNORE_UPDATES, but
+                # and we cannot compare resource version by gt or lt just equality,
+                # so must have just one status update to match ignored resource version in next modify event
+                # https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions
+                status_patch = {}
+                now = datetime.datetime.now(datetime.timezone.utc)
                 if template:
-                    updateEsTemplate(templateName, template, item['metadata']['namespace'])
+                    update_ok = updateEsTemplate(item, template)
+                    status_patch = {"status": {"provisioned": "yes", "lastProvision": now }}
+                if update_ok and item['spec']['rolloverIndexAfterUpdate']:
+                    rollover_ok = rolloverAlias(item)
+                    if rollover_ok:
+                        status_patch["status"]["lastRollover"] = now
+                if 'status' in status_patch:
+                    updateStatus(item, status_patch)
 
-
-        #we need to list all check push them to elastic
-        # watch, push changes
-        # WHAT ABOUT DELETED RESOURCE? deleteTemplate option
-        # INDEX ROLLOVER AS OPTION IN TEMPLATE option rolloverIndexAfterUpdate
         # merge if muliple same index name?
-        pass
 
     resources = [
         {"group": "braedon.github.io", "vers": "v1alpha1", "customResource": "esqueries", "fn": esqueries_worker_run},
-        #{"group": "braedon.github.io", "vers": "v1alpha1", "customResource": "estemplates", "fn": estemplates_worker_run},
+        {"group": "braedon.github.io", "vers": "v1alpha1", "customResource": "estemplates", "fn": estemplates_worker_run},
     ]
 
     thrds = []
