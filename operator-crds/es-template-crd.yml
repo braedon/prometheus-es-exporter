@@ -1,0 +1,87 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: estemplates.braedon.github.io
+spec:
+  group: braedon.github.io
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                mappings:
+                  description: Template mappings, settings, index_patterns and version
+                  type: string
+                indexPatterns:
+                  type: array
+                  items:
+                    type: string
+                numberOfReplicas:
+                  description: Number of elasticsearch replicas
+                  format: int32
+                  minimum: 0
+                  type: integer
+                numberOfShards:
+                  description: Number of elasticsearch shards
+                  format: int32
+                  minimum: 1
+                  type: integer
+                order:
+                  description: Template order
+                  nullable: true
+                  type: integer
+                templateName:
+                  description: Template name in elasticsearch server
+                  pattern: ^[a-z0-9-_\.]+$
+                  type: string
+                rolloverIndexAfterUpdate:
+                  description: Wheather rollover index after template update
+                  type: boolean
+                  default: false
+                deleteTemplate:
+                  description: Whether to delete template from es when resource is removed
+                  type: boolean
+                  default: false
+                codec:
+                  default: best_compression
+                  type: string
+                  description: Index codec setting
+                refreshInterval:
+                   default: 90s
+                   type: string
+                   description: Index refresh_interval setting
+              required:
+              - mappings
+              - indexPatterns
+              - numberOfReplicas
+              - numberOfShards
+              - templateName
+            status:
+              type: object
+              properties:
+                lastProvisionedConfigHash:
+                  type: string
+                provisioned:
+                  type: string
+                  default: "no"
+                lastProvision:
+                  type: string
+                  format: date-time
+                lastRollover:
+                  type: string
+                  format: date-time
+      subresources:
+        status: {}
+  scope: Namespaced
+  names:
+    plural: estemplates
+    singular: estemplate
+    kind: ElasticQueryExporterTemplate
+    shortNames:
+      - est

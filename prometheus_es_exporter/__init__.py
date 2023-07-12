@@ -11,6 +11,7 @@ import time
 import datetime
 
 import requests
+import hashlib
 
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConnectionTimeout
@@ -490,7 +491,7 @@ def kubeOperator(config_dir, es_cluster):
     def estemplates_worker_run(watch_api, config_dir, customObjectsApi, group, vers, customResource):
         log.info("WORKER estemplates_worker_run RUNNING")
 
-        IGNORE_UPDATES = {}
+        TEMPLATES_PROVISION_STATUS = {}
 
         def updateStatus(item, merge_patch):
             templateName = item['spec']['templateName']
@@ -500,11 +501,9 @@ def kubeOperator(config_dir, es_cluster):
             # json_patch = {"op": "replace", "path": "/status/provisioned", "value": "NOT-WORKING-WITH-PYCLIENT"}
             # BUT WE ARE USING "Content-Type: application/merge-patch+json", because of python kube api client
             try:
-                api_response = customObjectsApi.patch_namespaced_custom_object_status(group, vers, namespace, customResource, item['metadata']['name'], merge_patch)
-                item_uid = api_response['metadata']['uid']
+                api_response = customObjectsApi.patch_namespaced_custom_object_status(group, vers, namespace, customResource, name, merge_patch)
                 item_resource_vers = api_response['metadata']['resourceVersion']
                 log.debug(f"Updated template {templateName} k8s ElasticQueryExporterTemplate Status {api_response['status']}, resource version: {item_resource_vers}")
-                IGNORE_UPDATES[item_uid] = item_resource_vers
             except Exception as e:
                 log.error(f"Updating template {name} k8s ElasticQueryExporterTemplate Status Exception: {str(e)}")
 
@@ -587,40 +586,56 @@ def kubeOperator(config_dir, es_cluster):
 
         for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource):
             item = ev['object']
-            item_uid = item['metadata']['uid']
             item_resource_version = item['metadata']['resourceVersion']
             templateName = item['spec']['templateName']
-
-            log.debug(f"Template event {ev['type']}, name: {item['metadata']['name']}, resource version: {ev['object']['metadata']['resourceVersion']}")
+            name = item['metadata']['name']
+            log.debug(f"Template event {ev['type']}, name: {name}, resource version: {item_resource_version}")
 
             if ev['type'] == 'DELETED':
                 if item['spec']['deleteTemplate']:
                     deleteEsTemplate(templateName)
+                    log.info(f"Deleted template {templateName} from ES")
                 if item['spec']['rolloverIndexAfterUpdate']:
                     rolloverAlias(item)
             if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
-                if ev['type'] == 'MODIFIED' and item_uid in IGNORE_UPDATES and item_resource_version == IGNORE_UPDATES[item_uid]:
-                    log.debug(f"Ignored k8s ElasticQueryExporterTemplate update for {item_uid} and version {item_resource_version} already managed, modified event caused by status update")
-                    continue
                 template = buildTemplate(item)
+                if not template:
+                    log.error(f"Bad template {name}")
+                    continue
+
+                template_hash = hashlib.md5(json.dumps(template).encode()).hexdigest()
+                if "status" in item and "lastProvisionedConfigHash" in item["status"] and item["status"]["lastProvisionedConfigHash"] == template_hash:
+                    log.info(f"Skip updating template {templateName} for {name}, same configuration")
+                    continue
+                # check if we already provisioned same template with same config, eg B/G deploy
+                if templateName in TEMPLATES_PROVISION_STATUS \
+                    and TEMPLATES_PROVISION_STATUS[templateName]["hash"] == template_hash \
+                    and TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"]:
+                    log.info(f"Skip updating template {templateName} for {name}, same configuration, but updating it's status")
+                    updateStatus(item, {"status":{
+                                        "provisioned": "yes",
+                                        "lastProvision": TEMPLATES_PROVISION_STATUS[templateName]["last_provision"],
+                                        "lastProvisionedConfigHash": TEMPLATES_PROVISION_STATUS[templateName]["hash"],
+                                        "lastRollover": TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"]
+                                        }
+                    })
+                    continue
+
                 # We need just one status update in this cycle, because it will generate modiefied event
-                # updateStatus will add ignore for resource version to IGNORE_UPDATES, but
-                # and we cannot compare resource version by gt or lt just equality,
-                # so must have just one status update to match ignored resource version in next modify event
-                # https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions
                 status_patch = {}
                 now = datetime.datetime.now(datetime.timezone.utc)
-                if template:
-                    update_ok = updateEsTemplate(item, template)
-                    status_patch = {"status": {"provisioned": "yes", "lastProvision": now }}
-                if update_ok and item['spec']['rolloverIndexAfterUpdate']:
-                    rollover_ok = rolloverAlias(item)
-                    if rollover_ok:
-                        status_patch["status"]["lastRollover"] = now
+                update_ok = updateEsTemplate(item, template)
+                if update_ok:
+                    TEMPLATES_PROVISION_STATUS[templateName] = {"hash": template_hash, "last_provision": now, "last_rollover": None }
+                    status_patch = {"status": {"provisioned": "yes", "lastProvision": now, "lastProvisionedConfigHash": template_hash}}
+                    log.info(f"Updating ES {template}, {name} sucessfull")
+                    if item['spec']['rolloverIndexAfterUpdate']:
+                        rollover_ok = rolloverAlias(item)
+                        if rollover_ok:
+                            status_patch["status"]["lastRollover"] = now
+                            TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"] = now
                 if 'status' in status_patch:
                     updateStatus(item, status_patch)
-
-        # merge if muliple same index name?
 
     resources = [
         {"group": "braedon.github.io", "vers": "v1alpha1", "customResource": "esqueries", "fn": esqueries_worker_run},
