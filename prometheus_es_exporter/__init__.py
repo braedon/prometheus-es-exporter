@@ -595,8 +595,6 @@ def kubeOperator(config_dir, es_cluster):
                 if item['spec']['deleteTemplate']:
                     deleteEsTemplate(templateName)
                     log.info(f"Deleted template {templateName} from ES")
-                if item['spec']['rolloverIndexAfterUpdate']:
-                    rolloverAlias(item)
             if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
                 template = buildTemplate(item)
                 if not template:
