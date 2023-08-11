@@ -473,24 +473,27 @@ def kubeOperator(config_dir, es_cluster):
                 config.write(configfile)
 
         items_in_ns = []
-        for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource):
-            item = ev["object"]
-            namespace = item["metadata"]["namespace"]
-            name = item["metadata"]["name"]
-            if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
-                updateConfigs(item)
-                items_in_ns.append(getConfigFile(name, namespace, False))
-            if ev['type'] == 'DELETED':
-                cfgFile = getConfigFile(name, namespace, False)
-                try:
-                    log.info('Removing config ' + str(cfgFile))
-                    os.remove(config_dir + '/' + cfgFile)
-                except Exception as e:
-                    log.error("Operator: " + str(e))
+        while True:
+            try:
+                log.info(f"Start listening for {customResource}")
+                for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource, timeout_seconds = 0, _request_timeout = 60):
+                    item = ev["object"]
+                    namespace = item["metadata"]["namespace"]
+                    name = item["metadata"]["name"]
+                    if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
+                        updateConfigs(item)
+                        items_in_ns.append(getConfigFile(name, namespace, False))
+                    if ev['type'] == 'DELETED':
+                        cfgFile = getConfigFile(name, namespace, False)
+                        try:
+                            log.info('Removing config ' + str(cfgFile))
+                            os.remove(config_dir + '/' + cfgFile)
+                        except Exception as e:
+                            log.error("Operator: " + str(e))
+            except Exception as e:
+                log.info(str(e))
 
     def estemplates_worker_run(watch_api, config_dir, customObjectsApi, group, vers, customResource):
-        log.info("WORKER estemplates_worker_run RUNNING")
-
         TEMPLATES_PROVISION_STATUS = {}
 
         def updateStatus(item, merge_patch):
@@ -584,56 +587,61 @@ def kubeOperator(config_dir, es_cluster):
                 return True
             return False
 
-        for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource):
-            item = ev['object']
-            item_resource_version = item['metadata']['resourceVersion']
-            templateName = item['spec']['templateName']
-            name = item['metadata']['name']
-            log.debug(f"Template event {ev['type']}, name: {name}, resource version: {item_resource_version}")
+        while True:
+            try:
+                log.info(f"Start listening for {customResource}")
+                for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource, timeout_seconds = 0, _request_timeout = 60):
+                    item = ev['object']
+                    item_resource_version = item['metadata']['resourceVersion']
+                    templateName = item['spec']['templateName']
+                    name = item['metadata']['name']
+                    log.debug(f"Template event {ev['type']}, name: {name}, resource version: {item_resource_version}")
 
-            if ev['type'] == 'DELETED':
-                if item['spec']['deleteTemplate']:
-                    deleteEsTemplate(templateName)
-                    log.info(f"Deleted template {templateName} from ES")
-            if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
-                template = buildTemplate(item)
-                if not template:
-                    log.error(f"Bad template {name}")
-                    continue
+                    if ev['type'] == 'DELETED':
+                        if item['spec']['deleteTemplate']:
+                            deleteEsTemplate(templateName)
+                            log.info(f"Deleted template {templateName} from ES")
+                    if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
+                        template = buildTemplate(item)
+                        if not template:
+                            log.error(f"Bad template {name}")
+                            continue
 
-                template_hash = hashlib.md5(json.dumps(template).encode()).hexdigest()
-                if "status" in item and "lastProvisionedConfigHash" in item["status"] and item["status"]["lastProvisionedConfigHash"] == template_hash:
-                    log.info(f"Skip updating template {templateName} for {name}, same configuration")
-                    continue
-                # check if we already provisioned same template with same config, eg B/G deploy
-                if templateName in TEMPLATES_PROVISION_STATUS \
-                    and TEMPLATES_PROVISION_STATUS[templateName]["hash"] == template_hash \
-                    and TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"]:
-                    log.info(f"Skip updating template {templateName} for {name}, same configuration, but updating it's status")
-                    updateStatus(item, {"status":{
-                                        "provisioned": "yes",
-                                        "lastProvision": TEMPLATES_PROVISION_STATUS[templateName]["last_provision"],
-                                        "lastProvisionedConfigHash": TEMPLATES_PROVISION_STATUS[templateName]["hash"],
-                                        "lastRollover": TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"]
-                                        }
-                    })
-                    continue
+                        template_hash = hashlib.md5(json.dumps(template).encode()).hexdigest()
+                        if "status" in item and "lastProvisionedConfigHash" in item["status"] and item["status"]["lastProvisionedConfigHash"] == template_hash:
+                            log.info(f"Skip updating template {templateName} for {name}, same configuration")
+                            continue
+                        # check if we already provisioned same template with same config, eg B/G deploy
+                        if templateName in TEMPLATES_PROVISION_STATUS \
+                            and TEMPLATES_PROVISION_STATUS[templateName]["hash"] == template_hash \
+                            and TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"]:
+                            log.info(f"Skip updating template {templateName} for {name}, same configuration, but updating it's status")
+                            updateStatus(item, {"status":{
+                                                "provisioned": "yes",
+                                                "lastProvision": TEMPLATES_PROVISION_STATUS[templateName]["last_provision"],
+                                                "lastProvisionedConfigHash": TEMPLATES_PROVISION_STATUS[templateName]["hash"],
+                                                "lastRollover": TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"]
+                                                }
+                            })
+                            continue
 
-                # We need just one status update in this cycle, because it will generate modiefied event
-                status_patch = {}
-                now = datetime.datetime.now(datetime.timezone.utc)
-                update_ok = updateEsTemplate(item, template)
-                if update_ok:
-                    TEMPLATES_PROVISION_STATUS[templateName] = {"hash": template_hash, "last_provision": now, "last_rollover": None }
-                    status_patch = {"status": {"provisioned": "yes", "lastProvision": now, "lastProvisionedConfigHash": template_hash}}
-                    log.info(f"Updating ES {template}, {name} sucessfull")
-                    if item['spec']['rolloverIndexAfterUpdate']:
-                        rollover_ok = rolloverAlias(item)
-                        if rollover_ok:
-                            status_patch["status"]["lastRollover"] = now
-                            TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"] = now
-                if 'status' in status_patch:
-                    updateStatus(item, status_patch)
+                        # We need just one status update in this cycle, because it will generate modiefied event
+                        status_patch = {}
+                        now = datetime.datetime.now(datetime.timezone.utc)
+                        update_ok = updateEsTemplate(item, template)
+                        if update_ok:
+                            TEMPLATES_PROVISION_STATUS[templateName] = {"hash": template_hash, "last_provision": now, "last_rollover": None }
+                            status_patch = {"status": {"provisioned": "yes", "lastProvision": now, "lastProvisionedConfigHash": template_hash}}
+                            log.info(f"Updating ES {template}, {name} sucessfull")
+                            if item['spec']['rolloverIndexAfterUpdate']:
+                                rollover_ok = rolloverAlias(item)
+                                if rollover_ok:
+                                    status_patch["status"]["lastRollover"] = now
+                                    TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"] = now
+                        if 'status' in status_patch:
+                            updateStatus(item, status_patch)
+            except Exception as e:
+                log.info(str(e))
 
     resources = [
         {"group": "braedon.github.io", "vers": "v1alpha1", "customResource": "esqueries", "fn": esqueries_worker_run},
