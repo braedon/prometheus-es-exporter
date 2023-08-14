@@ -476,7 +476,7 @@ def kubeOperator(config_dir, es_cluster):
         while True:
             try:
                 log.info(f"Start listening for {customResource}")
-                for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource, timeout_seconds = 0, _request_timeout = 60):
+                for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource, timeout_seconds = 0, _request_timeout = (30, 24*3600)):
                     item = ev["object"]
                     namespace = item["metadata"]["namespace"]
                     name = item["metadata"]["name"]
@@ -590,7 +590,7 @@ def kubeOperator(config_dir, es_cluster):
         while True:
             try:
                 log.info(f"Start listening for {customResource}")
-                for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource, timeout_seconds = 0, _request_timeout = 60):
+                for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource, timeout_seconds = 0, _request_timeout = (30, 24*3600)):
                     item = ev['object']
                     item_resource_version = item['metadata']['resourceVersion']
                     templateName = item['spec']['templateName']
