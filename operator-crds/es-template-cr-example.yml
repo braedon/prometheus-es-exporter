@@ -1,0 +1,16 @@
+apiVersion: braedon.github.io/v1alpha1
+kind: ElasticQueryExporterTemplate
+metadata:
+  name: tombo-template-testing
+  namespace: default
+spec:
+  templateName: tombo-teplate-operator
+  mappings: |
+    {}
+  indexPatterns: # use whole index names not just something with *, we need full names for rollover
+  - test-nginx-nginx-access
+  numberOfReplicas: 2
+  numberOfShards: 2
+  order: 27
+  rolloverIndexAfterUpdate: true
+  deleteTemplate: true

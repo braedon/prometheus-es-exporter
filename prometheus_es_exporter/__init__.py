@@ -8,6 +8,10 @@ import logging
 import os
 import sched
 import time
+import datetime
+
+import requests
+import hashlib
 
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConnectionTimeout
@@ -23,8 +27,12 @@ from . import nodes_stats_parser
 from .metrics import (group_metrics, gauge_generator,
                       format_metric_name, merge_metric_dicts)
 from .parser import parse_response
-from .scheduler import schedule_job
+from .scheduler import schedule_jobs
 from .utils import log_exceptions, nice_shutdown
+
+from multiprocessing import Process
+from threading import Thread
+import kubernetes
 
 log = logging.getLogger(__name__)
 
@@ -199,6 +207,22 @@ class QueryMetricCollector(object):
         for metric_dict in query_metrics.values():
             yield from gauge_generator(metric_dict)
 
+
+class QuerySingleMetricCollector(object):
+
+    def collect(self):
+        query_metrics = METRICS_BY_QUERY.copy()
+
+        single_metrics = "es_exporter_queries"
+        single_metric_dict = {}
+        single_metric_dict[single_metrics] = ()
+
+        for metric_dict in query_metrics.values():
+            idx_key = list(metric_dict.keys())[0]
+            tupleAsList = list(metric_dict[idx_key])
+            orig_value = tupleAsList[2][list(tupleAsList[2].keys())[0]]
+            single_metric_dict[single_metrics] = ('', {"label": idx_key}, { (idx_key,"label"): orig_value} )
+            yield from gauge_generator(single_metric_dict)
 
 def run_query(es_client, query_name, indices, query,
               timeout, on_error, on_missing):
@@ -397,6 +421,303 @@ def configparser_enum_conv(enum):
 
     return conv
 
+def kubeOperator(config_dir, es_cluster):
+    kubeconf_loaded = False
+    try:
+        kubernetes.config.load_incluster_config()
+        kubeconf_loaded = True
+    except kubernetes.config.ConfigException:
+        kubernetes.config.load_kube_config()
+        kubeconf_loaded = True
+        log.info("Operator loaded local KUBECONFIG")
+    except Exception as e:
+        log.error("Operator: " + str(e))
+
+    if not kubeconf_loaded:
+        log.info("Operator - exiting operator process, kubeconfig not set")
+        return
+
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+
+    customObjectsApi = kubernetes.client.CustomObjectsApi()
+    #v1 = client.CoreV1Api()
+
+
+    watch = kubernetes.watch.Watch()
+
+    def esqueries_worker_run(watch_api, config_dir, customObjectsApi, group, vers, customResource):
+        log.info("WORKER esqueries_worker_run RUNNING")
+
+        def getSection(name):
+            return "query_" + name.replace("-","_")
+
+        def getConfigFile(name, ns, adddir = True):
+            if adddir:
+                return config_dir + '/' + ns + '_' + getSection(name) + '.cfg'
+            else:
+                return ns + '_' + getSection(name) + '.cfg'
+
+        def updateConfigs(item):
+            config = configparser.ConfigParser()
+            name = item["metadata"]["name"]
+            ns =  item["metadata"]["namespace"]
+            section = getSection(item["spec"]["label"])
+            config.add_section(section)
+            spec = item["spec"]
+            for k, v in spec.items():
+                config.set(section, str(k), str(v))
+            # can we hit parcial write during read in main thread? should we create tmp config and move atomically?
+            with open(getConfigFile(name, ns), 'w') as configfile:
+                log.info('Writing config ' + getConfigFile(name, ns))
+                config.write(configfile)
+
+        items_in_ns = []
+        while True:
+            try:
+                log.info(f"Start listening for {customResource}")
+                for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource, timeout_seconds = 0, _request_timeout = (30, 24*3600)):
+                    item = ev["object"]
+                    namespace = item["metadata"]["namespace"]
+                    name = item["metadata"]["name"]
+                    if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
+                        updateConfigs(item)
+                        items_in_ns.append(getConfigFile(name, namespace, False))
+                    if ev['type'] == 'DELETED':
+                        cfgFile = getConfigFile(name, namespace, False)
+                        try:
+                            log.info('Removing config ' + str(cfgFile))
+                            os.remove(config_dir + '/' + cfgFile)
+                        except Exception as e:
+                            log.error("Operator: " + str(e))
+            except Exception as e:
+                log.info(str(e))
+
+    def estemplates_worker_run(watch_api, config_dir, customObjectsApi, group, vers, customResource):
+        TEMPLATES_PROVISION_STATUS = {}
+
+        def updateStatus(item, merge_patch):
+            templateName = item['spec']['templateName']
+            name = item['metadata']['name']
+            namespace = item['metadata']['namespace']
+            # THIS BELOW IS JSON-PATCH with Content-Type: application/json-patch+json
+            # json_patch = {"op": "replace", "path": "/status/provisioned", "value": "NOT-WORKING-WITH-PYCLIENT"}
+            # BUT WE ARE USING "Content-Type: application/merge-patch+json", because of python kube api client
+            try:
+                api_response = customObjectsApi.patch_namespaced_custom_object_status(group, vers, namespace, customResource, name, merge_patch)
+                item_resource_vers = api_response['metadata']['resourceVersion']
+                log.debug(f"Updated template {templateName} k8s ElasticQueryExporterTemplate Status {api_response['status']}, resource version: {item_resource_vers}")
+            except Exception as e:
+                log.error(f"Updating template {name} k8s ElasticQueryExporterTemplate Status Exception: {str(e)}")
+
+        def updateEsTemplate(item, template):
+            err = None
+            templateName = item['spec']['templateName']
+            namespace = item['metadata']['namespace']
+            log.debug(f"Updating template {templateName} on ES cluster")
+            try:
+                es_request = requests.put(
+                    f"{es_cluster[0]}/_template/{templateName}",
+                    json=template,
+                    timeout=15
+                )
+            except Exception as e:
+                log.error(f"Updating estemplate {template} Exception: {str(e)}")
+                err = e
+            else:
+                if not es_request.ok:
+                    log.error(f"Updating estemplate {template} returned error -> {json.dumps(es_request.json())}")
+                    if not err:
+                        err = json.dumps(es_request.json())
+            return err
+
+        def deleteEsTemplate(templateName):
+            err = None
+            log.debug(f"Deleting template {templateName}")
+            try:
+                es_request = requests.delete(f"{es_cluster[0]}/_template/{templateName}", timeout=15)
+            except Exception as e:
+                log.error(f"Deleting estemplate {template} Exception: {str(e)}")
+                err = str(e)
+            else:
+                if not es_request.ok:
+                    log.error(f"Deleting template {template} returned error {json.dumps(es_request.json())}")
+                    if not err:
+                        err = json.dumps(es_request.json())
+            return err
+
+        def buildTemplate(resource):
+            err = None
+            try:
+                mappings = json.loads(item['spec']['mappings'])
+                idxPatterns = item['spec']['indexPatterns']
+                idxPatterns = [pattern + "-*" for pattern in idxPatterns]
+            except ValueError as e:
+                log.error(f"Mapping error in {item['spec']['templateName']} custom resource")
+                err = str(e)
+            else:
+                template = {
+                    "index_patterns": idxPatterns,
+                    "settings": {
+                        "index": {
+                            "codec": item['spec']['codec'],
+                            "refresh_interval": item['spec']['refreshInterval'],
+                            "number_of_shards": item['spec']['numberOfShards'],
+                            "number_of_replicas": item['spec']['numberOfReplicas']
+                        }
+                    },
+                    "mappings": mappings,
+                }
+
+                if item['spec']['order']:
+                    template['order'] = item['spec']['order']
+
+                return template, None
+            return None, err
+
+        def rolloverAlias(item):
+            idxPatterns = item['spec']['indexPatterns']
+            namespace = item['metadata']['namespace']
+            resp = []
+            for pattern in idxPatterns:
+                log.info(f"Rolling index {pattern} [ {pattern}-writer ]")
+                try:
+                    es_request = requests.post(f"{es_cluster[0]}/{pattern}-writer/_rollover", timeout=15)
+                except Exception as e:
+                    resp.append(False)
+                    log.error(f"Rolling index {pattern} Exception: {str(e)}")
+                else:
+                    if es_request.ok:
+                        resp.append(True)
+                    else:
+                        resp.append(False)
+                        log.error(f"Rolling index {pattern} returned error {json.dumps(es_request.json())}")
+            if all(resp):
+                return True
+            return False
+
+        while True:
+            try:
+                log.info(f"Start listening for {customResource}")
+                for ev in watch.stream(customObjectsApi.list_cluster_custom_object, group, vers, customResource, timeout_seconds = 0, _request_timeout = (30, 24*3600)):
+                    item = ev['object']
+                    item_resource_version = item['metadata']['resourceVersion']
+                    templateName = item['spec']['templateName']
+                    name = item['metadata']['name']
+                    log.debug(f"Template event {ev['type']}, name: {name}, resource version: {item_resource_version}")
+
+                    status_patch = {}
+
+                    if ev['type'] == 'DELETED':
+                        if item['spec']['deleteTemplate']:
+                            err = deleteEsTemplate(templateName)
+                            log.info(f"Deleted template {templateName} from ES")
+                            if err:
+                                status_patch = {"status": {"lastError": now, "lastErrorDescription": err}}
+                                updateStatus(item, status_patch)
+                    if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
+                        template, err = buildTemplate(item)
+                        if not template:
+                            log.error(f"Bad template {name}")
+                            status_patch = {"status": {"lastError": now, "lastErrorDescription": err}}
+                            updateStatus(item, status_patch)
+                            continue
+
+                        template_hash = hashlib.md5(json.dumps(template).encode()).hexdigest()
+                        if "status" in item and "lastProvisionedConfigHash" in item["status"] and item["status"]["lastProvisionedConfigHash"] == template_hash:
+                            log.info(f"Skip updating template {templateName} for {name}, same configuration")
+                            continue
+                        # check if we already provisioned same template with same config, eg B/G deploy
+                        if templateName in TEMPLATES_PROVISION_STATUS \
+                            and TEMPLATES_PROVISION_STATUS[templateName]["hash"] == template_hash \
+                            and TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"]:
+                            log.info(f"Skip updating template {templateName} for {name}, same configuration, but updating it's status")
+                            updateStatus(item, {"status":{
+                                                "provisioned": "yes",
+                                                "lastProvision": TEMPLATES_PROVISION_STATUS[templateName]["last_provision"],
+                                                "lastProvisionedConfigHash": TEMPLATES_PROVISION_STATUS[templateName]["hash"],
+                                                "lastRollover": TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"],
+                                                "lastErrorDescription": ""
+                                                }
+                            })
+                            continue
+
+                        # We need just one status update in this cycle, because it will generate modiefied event
+                        now = datetime.datetime.now(datetime.timezone.utc)
+                        err = updateEsTemplate(item, template)
+                        if not err:
+                            TEMPLATES_PROVISION_STATUS[templateName] = {"hash": template_hash, "last_provision": now, "last_rollover": None }
+                            status_patch = { "status": {
+                                             "provisioned": "yes",
+                                             "lastProvision": now,
+                                             "lastProvisionedConfigHash": template_hash,
+                                             "lastErrorDescription": ""
+                                            }}
+                            log.info(f"Updating ES {template}, {name} sucessfull")
+                            if item['spec']['rolloverIndexAfterUpdate']:
+                                rollover_ok = rolloverAlias(item)
+                                if rollover_ok:
+                                    status_patch["status"]["lastRollover"] = now
+                                    TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"] = now
+                        else:
+                            status_patch = {"status": {"lastError": now, "lastErrorDescription": err}}
+                        if 'status' in status_patch:
+                            updateStatus(item, status_patch)
+            except Exception as e:
+                log.info(str(e))
+
+    resources = [
+        {"group": "braedon.github.io", "vers": "v1alpha1", "customResource": "esqueries", "fn": esqueries_worker_run},
+        {"group": "braedon.github.io", "vers": "v1alpha1", "customResource": "estemplates", "fn": estemplates_worker_run},
+    ]
+
+    thrds = []
+    for resource in resources:
+
+        worker = Thread(target=resource['fn'],args=(watch, config_dir, customObjectsApi, resource["group"], resource["vers"], resource["customResource"]) )
+        worker.daemon = True
+        worker.start()
+        thrds.append(worker)
+
+    for thrd in thrds:
+        thrd.join()
+
+class LoadConfig():
+    def __init__(self, config_file, config_dir ):
+        self.config_file = config_file
+        self.config_dir = config_dir
+        self.query_prefix = 'query_'
+
+    def load(self):
+        config = configparser.ConfigParser(converters=CONFIGPARSER_CONVERTERS)
+        try:
+            config.read(self.config_file)
+        except Exception as e:
+            log.error(str(e))
+
+        config_dir_file_pattern = os.path.join(self.config_dir, '*.cfg')
+        config_dir_sorted_files = sorted(glob.glob(config_dir_file_pattern))
+        config.read(config_dir_sorted_files)
+        queries = {}
+        for section in config.sections():
+            if section.startswith(self.query_prefix):
+                query_name = section[len(self.query_prefix):]
+                interval = config.getfloat(section, 'QueryIntervalSecs',
+                                           fallback=15)
+                timeout = config.getfloat(section, 'QueryTimeoutSecs',
+                                          fallback=10)
+                indices = config.get(section, 'QueryIndices',
+                                     fallback='_all')
+                query = json.loads(config.get(section, 'QueryJson'))
+                on_error = config.getenum(section, 'QueryOnError',
+                                          fallback='drop')
+                on_missing = config.getenum(section, 'QueryOnMissing',
+                                            fallback='drop')
+
+                queries[query_name] = (interval, timeout, indices, query,
+                                       on_error, on_missing)
+        return queries
+
 
 CONFIGPARSER_CONVERTERS = {
     'enum': configparser_enum_conv(('preserve', 'drop', 'zero'))
@@ -507,6 +828,15 @@ CONFIGPARSER_CONVERTERS = {
               help='Detail level to log. (default: INFO)')
 @click.option('--verbose', '-v', default=False, is_flag=True,
               help='Turn on verbose (DEBUG) logging. Overrides --log-level.')
+@click.option('--operator-mode', default=False, is_flag=True,
+              help='Turn on kubernetes operator mode.')
+@click.option('--single-metric', default=True, is_flag=True,
+              help='Use just one metrics with labels with operator mode')
+@click.option('--filter-customer-resource-labels',
+              callback=indices_stats_indices_parser,
+              help='Consider only reources which match label. '
+                   'Labels should be separated by commas e.g. env=dev,app=base.')
+
 @click_config_file.configuration_option()
 def cli(**options):
     """Export Elasticsearch query results to Prometheus."""
@@ -579,44 +909,16 @@ def cli(**options):
     scheduler = None
 
     if not options['query_disable']:
-        config = configparser.ConfigParser(converters=CONFIGPARSER_CONVERTERS)
-        config.read(options['config_file'])
-
-        config_dir_file_pattern = os.path.join(options['config_dir'], '*.cfg')
-        config_dir_sorted_files = sorted(glob.glob(config_dir_file_pattern))
-        config.read(config_dir_sorted_files)
-
-        query_prefix = 'query_'
-        queries = {}
-        for section in config.sections():
-            if section.startswith(query_prefix):
-                query_name = section[len(query_prefix):]
-                interval = config.getfloat(section, 'QueryIntervalSecs',
-                                           fallback=15)
-                timeout = config.getfloat(section, 'QueryTimeoutSecs',
-                                          fallback=10)
-                indices = config.get(section, 'QueryIndices',
-                                     fallback='_all')
-                query = json.loads(config.get(section, 'QueryJson'))
-                on_error = config.getenum(section, 'QueryOnError',
-                                          fallback='drop')
-                on_missing = config.getenum(section, 'QueryOnMissing',
-                                            fallback='drop')
-
-                queries[query_name] = (interval, timeout, indices, query,
-                                       on_error, on_missing)
+        load = LoadConfig(options['config_file'], options['config_dir'])
 
         scheduler = sched.scheduler()
-
-        if queries:
-            for query_name, (interval, timeout, indices, query,
-                             on_error, on_missing) in queries.items():
-                schedule_job(scheduler, executor, interval,
-                             run_query, es_client, query_name, indices, query,
-                             timeout, on_error, on_missing)
-        else:
-            log.error('No queries found in config file(s)')
-            return
+        #schedule_jobs(scheduler, executor, load, run_query, es_client)
+        last_schedule = {}
+        scheduler.enterabs(time=time.monotonic(),
+                        priority=1,
+                        action=schedule_jobs,
+                        argument=(last_schedule, scheduler, executor, load, run_query, es_client),
+                        )
 
     if not options['cluster_health_disable']:
         REGISTRY.register(ClusterHealthCollector(es_client,
@@ -646,17 +948,27 @@ def cli(**options):
                                                 fields=options['indices_stats_fields']))
 
     if scheduler:
-        REGISTRY.register(QueryMetricCollector())
+        if options['operator_mode'] and options['single_metric']:
+            REGISTRY.register(QuerySingleMetricCollector())
+        else:
+            REGISTRY.register(QueryMetricCollector())
 
     log.info('Starting server...')
     start_http_server(port)
     log.info('Server started on port %(port)s', {'port': port})
+
+    operator = None
+    if options['operator_mode']:
+        operator = Process(target=kubeOperator, args=(options['config_dir'], es_cluster,))
+        operator.start()
 
     if scheduler:
         scheduler.run()
     else:
         while True:
             time.sleep(5)
+    if operator:
+        operator.join(10)
 
 
 @log_exceptions(exit_on_exception=True)
