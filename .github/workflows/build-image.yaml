@@ -6,7 +6,7 @@ env:
 on:
   push:
     branch:
-      - "feat/operator"
+      - "feat/.*"
 
 jobs:
   build-and-push:
