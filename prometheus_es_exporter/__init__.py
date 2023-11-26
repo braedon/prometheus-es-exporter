@@ -616,7 +616,6 @@ def kubeOperator(config_dir, es_cluster):
                                 status_patch = {"status": {"lastError": now, "lastErrorDescription": err}}
                                 updateStatus(item, status_patch)
                     if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
-                        print('EVENT MOD/ADD')
                         template, err = buildTemplate(item)
                         if not template:
                             log.error(f"Bad template {name}")
@@ -638,7 +637,6 @@ def kubeOperator(config_dir, es_cluster):
                                                 "lastProvision": TEMPLATES_PROVISION_STATUS[templateName]["last_provision"],
                                                 "lastProvisionedConfigHash": TEMPLATES_PROVISION_STATUS[templateName]["hash"],
                                                 "lastRollover": TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"],
-                                                "lastError": "",
                                                 "lastErrorDescription": ""
                                                 }
                             })
@@ -653,7 +651,6 @@ def kubeOperator(config_dir, es_cluster):
                                              "provisioned": "yes",
                                              "lastProvision": now,
                                              "lastProvisionedConfigHash": template_hash,
-                                             "lastError": "",
                                              "lastErrorDescription": ""
                                             }}
                             log.info(f"Updating ES {template}, {name} sucessfull")
