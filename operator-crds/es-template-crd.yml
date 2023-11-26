@@ -76,6 +76,12 @@ spec:
                 lastRollover:
                   type: string
                   format: date-time
+                lastError:
+                  type: string
+                  format: date-time
+                lastErrorDescription:
+                  type: string
+
       subresources:
         status: {}
   scope: Namespaced

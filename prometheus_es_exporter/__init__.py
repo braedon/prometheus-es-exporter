@@ -511,6 +511,7 @@ def kubeOperator(config_dir, es_cluster):
                 log.error(f"Updating template {name} k8s ElasticQueryExporterTemplate Status Exception: {str(e)}")
 
         def updateEsTemplate(item, template):
+            err = None
             templateName = item['spec']['templateName']
             namespace = item['metadata']['namespace']
             log.debug(f"Updating template {templateName} on ES cluster")
@@ -522,30 +523,38 @@ def kubeOperator(config_dir, es_cluster):
                 )
             except Exception as e:
                 log.error(f"Updating estemplate {template} Exception: {str(e)}")
+                err = e
             else:
-                if es_request.ok:
-                    return True
-                else:
-                    log.error(f"Updating estemplate {template} returned error -> {json.dumps(r.json())}")
-            return False
+                if not es_request.ok:
+                    log.error(f"Updating estemplate {template} returned error -> {json.dumps(es_request.json())}")
+                    if not err:
+                        err = json.dumps(es_request.json())
+            return err
 
         def deleteEsTemplate(templateName):
+            err = None
             log.debug(f"Deleting template {templateName}")
             try:
                 es_request = requests.delete(f"{es_cluster[0]}/_template/{templateName}", timeout=15)
             except Exception as e:
                 log.error(f"Deleting estemplate {template} Exception: {str(e)}")
-            if not es_request.ok:
-                log.error(f"Deleting template {template} returned error {json.dumps(es_request.json())}")
-
+                err = str(e)
+            else:
+                if not es_request.ok:
+                    log.error(f"Deleting template {template} returned error {json.dumps(es_request.json())}")
+                    if not err:
+                        err = json.dumps(es_request.json())
+            return err
 
         def buildTemplate(resource):
+            err = None
             try:
                 mappings = json.loads(item['spec']['mappings'])
                 idxPatterns = item['spec']['indexPatterns']
                 idxPatterns = [pattern + "-*" for pattern in idxPatterns]
             except ValueError as e:
                 log.error(f"Mapping error in {item['spec']['templateName']} custom resource")
+                err = str(e)
             else:
                 template = {
                     "index_patterns": idxPatterns,
@@ -563,8 +572,8 @@ def kubeOperator(config_dir, es_cluster):
                 if item['spec']['order']:
                     template['order'] = item['spec']['order']
 
-                return template
-            return None
+                return template, None
+            return None, err
 
         def rolloverAlias(item):
             idxPatterns = item['spec']['indexPatterns']
@@ -597,14 +606,22 @@ def kubeOperator(config_dir, es_cluster):
                     name = item['metadata']['name']
                     log.debug(f"Template event {ev['type']}, name: {name}, resource version: {item_resource_version}")
 
+                    status_patch = {}
+
                     if ev['type'] == 'DELETED':
                         if item['spec']['deleteTemplate']:
-                            deleteEsTemplate(templateName)
+                            err = deleteEsTemplate(templateName)
                             log.info(f"Deleted template {templateName} from ES")
+                            if err:
+                                status_patch = {"status": {"lastError": now, "lastErrorDescription": err}}
+                                updateStatus(item, status_patch)
                     if ev['type'] == 'ADDED' or ev['type'] == 'MODIFIED':
-                        template = buildTemplate(item)
+                        print('EVENT MOD/ADD')
+                        template, err = buildTemplate(item)
                         if not template:
                             log.error(f"Bad template {name}")
+                            status_patch = {"status": {"lastError": now, "lastErrorDescription": err}}
+                            updateStatus(item, status_patch)
                             continue
 
                         template_hash = hashlib.md5(json.dumps(template).encode()).hexdigest()
@@ -620,24 +637,33 @@ def kubeOperator(config_dir, es_cluster):
                                                 "provisioned": "yes",
                                                 "lastProvision": TEMPLATES_PROVISION_STATUS[templateName]["last_provision"],
                                                 "lastProvisionedConfigHash": TEMPLATES_PROVISION_STATUS[templateName]["hash"],
-                                                "lastRollover": TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"]
+                                                "lastRollover": TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"],
+                                                "lastError": "",
+                                                "lastErrorDescription": ""
                                                 }
                             })
                             continue
 
                         # We need just one status update in this cycle, because it will generate modiefied event
-                        status_patch = {}
                         now = datetime.datetime.now(datetime.timezone.utc)
-                        update_ok = updateEsTemplate(item, template)
-                        if update_ok:
+                        err = updateEsTemplate(item, template)
+                        if not err:
                             TEMPLATES_PROVISION_STATUS[templateName] = {"hash": template_hash, "last_provision": now, "last_rollover": None }
-                            status_patch = {"status": {"provisioned": "yes", "lastProvision": now, "lastProvisionedConfigHash": template_hash}}
+                            status_patch = { "status": {
+                                             "provisioned": "yes",
+                                             "lastProvision": now,
+                                             "lastProvisionedConfigHash": template_hash,
+                                             "lastError": "",
+                                             "lastErrorDescription": ""
+                                            }}
                             log.info(f"Updating ES {template}, {name} sucessfull")
                             if item['spec']['rolloverIndexAfterUpdate']:
                                 rollover_ok = rolloverAlias(item)
                                 if rollover_ok:
                                     status_patch["status"]["lastRollover"] = now
                                     TEMPLATES_PROVISION_STATUS[templateName]["last_rollover"] = now
+                        else:
+                            status_patch = {"status": {"lastError": now, "lastErrorDescription": err}}
                         if 'status' in status_patch:
                             updateStatus(item, status_patch)
             except Exception as e:
